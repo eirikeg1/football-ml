@@ -1,0 +1,53 @@
+feature_extractors:
+  player_profile:
+    input_dim: 50
+    hidden_dim: 128
+    output_dim: 64
+    num_layers: 3
+  player_form:
+    input_dim: 20
+    hidden_dim: 64
+    output_dim: 64
+    seq_len: 10
+  team_performance:
+    input_dim: 15
+    hidden_dim: 64
+    output_dim: 64
+  match_context:
+    input_dim: 10
+    output_dim: 32
+
+composition:
+  lineup_gnn:
+    player_dim: 128  # profile_output_dim + form_output_dim
+    hidden_dim: 128
+    output_dim: 64
+    num_layers: 2
+
+fusion:
+  type: "transformer"
+  d_model: 64
+  nhead: 4
+  num_layers: 2
+  output_dim: 128
+
+temporal:
+  type: "gru"
+  input_dim: 128
+  hidden_dim: 128
+  output_dim: 128
+  num_layers: 1
+
+heads:
+  match_outcome:
+    input_dim: 128
+    num_classes: 3
+  scoreline:
+    input_dim: 128
+    max_goals: 10
+  player_stat:
+    input_dim: 128
+    num_stats: 5
+  match_stat:
+    input_dim: 128
+    num_stats: 8

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "football-ml"
+version = "0.1.0"
+description = "Modular football statistics prediction pipeline"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.0",
+    "torch-geometric>=2.4",
+    "pyyaml>=6.0",
+    "dacite>=1.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "smoke: smoke tests (forward pass sanity checks)",
+    "integration: integration tests (multi-module combinations)",
+]

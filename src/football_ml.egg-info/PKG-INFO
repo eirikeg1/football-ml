@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: football-ml
+Version: 0.1.0
+Summary: Modular football statistics prediction pipeline
+Requires-Python: >=3.12
+Requires-Dist: torch>=2.0
+Requires-Dist: torch-geometric>=2.4
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: dacite>=1.8
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
