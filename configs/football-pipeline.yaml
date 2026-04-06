@@ -1,0 +1,52 @@
+data_sources:
+  sofascore_player_stats:
+    format: sofascore_v1
+    features: 25
+  espn_player_stats:
+    format: espn_v1
+    features: 20
+  match_schedule:
+    features: 10
+feature_extractors:
+  match_context:
+    input_dim: 10
+    output_dim: 32
+fusion:
+  type: transformer
+  d_model: 64
+  nhead: 4
+  num_layers: 2
+  output_dim: 128
+composition:
+  lineup_gnn:
+    player_dim: 128
+    hidden_dim: 128
+    output_dim: 64
+    num_layers: 2
+temporal:
+  type: gru
+  input_dim: 128
+  hidden_dim: 128
+  output_dim: 128
+  num_layers: 1
+heads:
+  match_outcome:
+    input_dim: 128
+    num_classes: 3
+  scoreline:
+    input_dim: 128
+    max_goals: 10
+  player_stat:
+    input_dim: 128
+    num_stats: 5
+  match_stat:
+    input_dim: 128
+    num_stats: 8
+augmentation:
+  normalize:
+    - method: minmax
+    - method: standard
+    - method: standard
+  feature_selection:
+    - method: all
+      threshold: 0.01

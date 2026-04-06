@@ -6,6 +6,7 @@
     moveNode,
     updateNodeParam,
     removeNode,
+    removeSelectedNodes,
     startConnection,
     finishConnection,
   } from "../lib/state.svelte";
@@ -30,7 +31,7 @@
   let { node, zoom }: Props = $props();
 
   let def = $derived(getNodeDef(node.defId)!);
-  let isSelected = $derived(graphState.selectedNodeId === node.instanceId);
+  let isSelected = $derived(graphState.selectedNodeIds.has(node.instanceId));
   let categoryColor = $derived(CATEGORY_COLORS[def.category]);
 
   let inputPorts = $derived(def.ports.filter((p) => p.type === "input"));
@@ -39,15 +40,17 @@
   const NODE_WIDTH = 200;
   const HEADER_HEIGHT = 32;
   const PORT_ROW_HEIGHT = 22;
-  const PARAM_ROW_HEIGHT = 24;
-  const PADDING_BOTTOM = 8;
+  const PARAM_ROW_HEIGHT = 26;
+  const PADDING_BOTTOM = 12;
+  const OVERFLOW_PAD = 6; // extra padding for border/shadow not to clip
 
-  let bodyHeight = $derived(
-    Math.max(inputPorts.length, outputPorts.length) * PORT_ROW_HEIGHT +
-      def.params.length * PARAM_ROW_HEIGHT +
-      PADDING_BOTTOM +
-      8
+  let portsHeight = $derived(
+    Math.max(inputPorts.length, outputPorts.length) * PORT_ROW_HEIGHT
   );
+  let paramsHeight = $derived(
+    def.params.length * PARAM_ROW_HEIGHT + (def.params.length > 0 ? 8 : 0)
+  );
+  let bodyHeight = $derived(portsHeight + paramsHeight + PADDING_BOTTOM + 8);
   let totalHeight = $derived(HEADER_HEIGHT + bodyHeight);
 
   // Dragging state
@@ -56,6 +59,7 @@
   let dragStartY = 0;
   let nodeStartX = 0;
   let nodeStartY = 0;
+  let dragGroupStart: { id: string; x: number; y: number }[] = [];
 
   function handleMouseDown(e: MouseEvent) {
     if ((e.target as HTMLElement).closest(".port, input, select")) return;
@@ -66,7 +70,23 @@
     dragStartY = e.clientY;
     nodeStartX = node.x;
     nodeStartY = node.y;
-    selectNode(node.instanceId);
+
+    // Shift+click toggles multi-select; plain click replaces selection
+    // But if this node is already in the selection, keep the group for dragging
+    if (e.shiftKey) {
+      selectNode(node.instanceId, true);
+    } else if (!graphState.selectedNodeIds.has(node.instanceId)) {
+      selectNode(node.instanceId);
+    }
+
+    // Snapshot all selected node positions for group drag
+    dragGroupStart = [];
+    for (const n of graphState.nodes) {
+      if (graphState.selectedNodeIds.has(n.instanceId)) {
+        dragGroupStart.push({ id: n.instanceId, x: n.x, y: n.y });
+      }
+    }
+
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
   }
@@ -75,7 +95,10 @@
     if (!isDragging) return;
     const dx = (e.clientX - dragStartX) / zoom;
     const dy = (e.clientY - dragStartY) / zoom;
-    moveNode(node.instanceId, nodeStartX + dx, nodeStartY + dy);
+    // Move all selected nodes together
+    for (const start of dragGroupStart) {
+      moveNode(start.id, start.x + dx, start.y + dy);
+    }
   }
 
   function handleMouseUp() {
@@ -91,7 +114,11 @@
       !(e.target instanceof HTMLInputElement) &&
       !(e.target instanceof HTMLSelectElement)
     ) {
-      removeNode(node.instanceId);
+      if (graphState.selectedNodeIds.size > 1) {
+        removeSelectedNodes();
+      } else {
+        removeNode(node.instanceId);
+      }
     }
   }
 
@@ -99,8 +126,9 @@
     return HEADER_HEIGHT + 12 + index * PORT_ROW_HEIGHT;
   }
 
-  function handleOutputPortClick(e: MouseEvent, portName: string) {
+  function handleOutputPortMouseDown(e: MouseEvent, portName: string) {
     e.stopPropagation();
+    e.preventDefault();
     const portIndex = outputPorts.findIndex((p) => p.name === portName);
     const portY = getPortY(portIndex);
     startConnection(
@@ -109,6 +137,28 @@
       node.x + NODE_WIDTH,
       node.y + portY
     );
+  }
+
+  function handleOutputPortClick(e: MouseEvent, portName: string) {
+    e.stopPropagation();
+    // If no pending connection, start one (click-to-connect mode)
+    if (!graphState.pendingConnection) {
+      const portIndex = outputPorts.findIndex((p) => p.name === portName);
+      const portY = getPortY(portIndex);
+      startConnection(
+        node.instanceId,
+        portName,
+        node.x + NODE_WIDTH,
+        node.y + portY
+      );
+    }
+  }
+
+  function handleInputPortMouseUp(e: MouseEvent, portName: string) {
+    e.stopPropagation();
+    if (graphState.pendingConnection) {
+      finishConnection(node.instanceId, portName);
+    }
   }
 
   function handleInputPortClick(e: MouseEvent, portName: string) {
@@ -147,14 +197,14 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<g transform="translate({node.x}, {node.y})">
-  <foreignObject width={NODE_WIDTH} height={totalHeight}>
+<g transform="translate({node.x - OVERFLOW_PAD}, {node.y - OVERFLOW_PAD})">
+  <foreignObject width={NODE_WIDTH + OVERFLOW_PAD * 2} height={totalHeight + OVERFLOW_PAD * 2}>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="node"
       class:selected={isSelected}
       onmousedown={handleMouseDown}
-      style="--cat-color: {categoryColor}; width: {NODE_WIDTH}px;"
+      style="--cat-color: {categoryColor}; width: {NODE_WIDTH}px; margin: {OVERFLOW_PAD}px;"
     >
       <!-- Header -->
       <div class="node-header">
@@ -242,26 +292,28 @@
   {#each inputPorts as port, i}
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <circle
-      cx="0"
-      cy={getPortY(i)}
+      cx={OVERFLOW_PAD}
+      cy={getPortY(i) + OVERFLOW_PAD}
       r="5"
       fill={portColor(port)}
       stroke="var(--bg-primary)"
       stroke-width="2"
       style="cursor: pointer; pointer-events: all;"
       onclick={(e) => { e.stopPropagation(); handleInputPortClick(e, port.name); }}
+      onmouseup={(e) => { e.stopPropagation(); handleInputPortMouseUp(e, port.name); }}
     />
   {/each}
   {#each outputPorts as port, i}
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <circle
-      cx={NODE_WIDTH}
-      cy={getPortY(i)}
+      cx={NODE_WIDTH + OVERFLOW_PAD}
+      cy={getPortY(i) + OVERFLOW_PAD}
       r="5"
       fill={portColor(port)}
       stroke="var(--bg-primary)"
       stroke-width="2"
       style="cursor: pointer; pointer-events: all;"
+      onmousedown={(e) => { handleOutputPortMouseDown(e, port.name); }}
       onclick={(e) => { e.stopPropagation(); handleOutputPortClick(e, port.name); }}
     />
   {/each}

@@ -15,7 +15,7 @@ function generateConnectionId(): string {
 export const graphState = $state({
   nodes: [] as NodeInstance[],
   connections: [] as Connection[],
-  selectedNodeId: null as string | null,
+  selectedNodeIds: new Set<string>(),
   selectedConnectionId: null as string | null,
   pendingConnection: null as PendingConnection | null,
 });
@@ -52,9 +52,18 @@ export function removeNode(instanceId: string): void {
   graphState.nodes = graphState.nodes.filter(
     (n) => n.instanceId !== instanceId
   );
-  if (graphState.selectedNodeId === instanceId) {
-    graphState.selectedNodeId = null;
-  }
+  graphState.selectedNodeIds.delete(instanceId);
+}
+
+export function removeSelectedNodes(): void {
+  const ids = new Set(graphState.selectedNodeIds);
+  graphState.connections = graphState.connections.filter(
+    (c) => !ids.has(c.fromNode) && !ids.has(c.toNode)
+  );
+  graphState.nodes = graphState.nodes.filter(
+    (n) => !ids.has(n.instanceId)
+  );
+  graphState.selectedNodeIds.clear();
 }
 
 export function moveNode(instanceId: string, x: number, y: number): void {
@@ -134,20 +143,37 @@ export function removeConnection(id: string): void {
 export function clearGraph(): void {
   graphState.nodes = [];
   graphState.connections = [];
-  graphState.selectedNodeId = null;
+  graphState.selectedNodeIds = new Set();
   graphState.selectedConnectionId = null;
   graphState.pendingConnection = null;
   nextId = 1;
 }
 
-export function selectNode(instanceId: string | null): void {
-  graphState.selectedNodeId = instanceId;
+export function selectNode(instanceId: string | null, additive = false): void {
   graphState.selectedConnectionId = null;
+  if (instanceId === null) {
+    graphState.selectedNodeIds = new Set();
+  } else if (additive) {
+    const next = new Set(graphState.selectedNodeIds);
+    if (next.has(instanceId)) {
+      next.delete(instanceId);
+    } else {
+      next.add(instanceId);
+    }
+    graphState.selectedNodeIds = next;
+  } else {
+    graphState.selectedNodeIds = new Set([instanceId]);
+  }
+}
+
+export function selectNodes(ids: string[]): void {
+  graphState.selectedConnectionId = null;
+  graphState.selectedNodeIds = new Set(ids);
 }
 
 export function selectConnection(id: string | null): void {
   graphState.selectedConnectionId = id;
-  graphState.selectedNodeId = null;
+  graphState.selectedNodeIds = new Set();
 }
 
 export function startConnection(

@@ -5,11 +5,17 @@
     cancelConnection,
     updatePendingConnection,
     selectNode,
+    selectNodes,
     selectConnection,
   } from "../lib/state.svelte";
   import { getNodeDef } from "../lib/registry";
   import GraphNode from "./GraphNode.svelte";
   import Connection from "./Connection.svelte";
+
+  const NODE_WIDTH = 200;
+  const HEADER_HEIGHT = 32;
+  const PORT_ROW_HEIGHT = 22;
+  const PARAM_ROW_HEIGHT = 26;
 
   // Pan & zoom state
   let panX = $state(0);
@@ -21,6 +27,18 @@
   let panStartPanX = 0;
   let panStartPanY = 0;
   let spaceHeld = $state(false);
+
+  // Box select state
+  let isBoxSelecting = $state(false);
+  let boxStart = $state({ x: 0, y: 0 });
+  let boxEnd = $state({ x: 0, y: 0 });
+
+  let boxRect = $derived({
+    x: Math.min(boxStart.x, boxEnd.x),
+    y: Math.min(boxStart.y, boxEnd.y),
+    width: Math.abs(boxEnd.x - boxStart.x),
+    height: Math.abs(boxEnd.y - boxStart.y),
+  });
 
   let svgEl: SVGSVGElement;
 
@@ -49,6 +67,16 @@
     zoom = newZoom;
   }
 
+  function getNodeHeight(node: { defId: string }): number {
+    const def = getNodeDef(node.defId);
+    if (!def) return 60;
+    const ports = Math.max(
+      def.ports.filter((p) => p.type === "input").length,
+      def.ports.filter((p) => p.type === "output").length
+    );
+    return HEADER_HEIGHT + ports * PORT_ROW_HEIGHT + def.params.length * PARAM_ROW_HEIGHT + 28;
+  }
+
   // Pan: middle-click or space+left-click
   function handleMouseDown(e: MouseEvent) {
     if (e.button === 1 || (e.button === 0 && spaceHeld)) {
@@ -61,12 +89,28 @@
       return;
     }
 
-    // Left click on empty canvas: deselect
-    if (e.button === 0 && e.target === svgEl) {
-      selectNode(null);
-      selectConnection(null);
-      if (graphState.pendingConnection) {
-        cancelConnection();
+    // Left click on empty canvas area
+    if (e.button === 0) {
+      // Check if clicking on the SVG background (not on a node/connection)
+      const target = e.target as Element;
+      const isCanvas = target === svgEl || target.tagName === "rect" || target.closest(".canvas-bg");
+
+      if (isCanvas) {
+        if (graphState.pendingConnection) {
+          cancelConnection();
+          return;
+        }
+
+        // Start box select
+        const pos = screenToGraph(e.clientX, e.clientY);
+        isBoxSelecting = true;
+        boxStart = { x: pos.x, y: pos.y };
+        boxEnd = { x: pos.x, y: pos.y };
+
+        if (!e.shiftKey) {
+          selectNode(null);
+          selectConnection(null);
+        }
       }
     }
   }
@@ -75,6 +119,12 @@
     if (isPanning) {
       panX = panStartPanX + (e.clientX - panStartX);
       panY = panStartPanY + (e.clientY - panStartY);
+      return;
+    }
+
+    if (isBoxSelecting) {
+      const pos = screenToGraph(e.clientX, e.clientY);
+      boxEnd = { x: pos.x, y: pos.y };
       return;
     }
 
@@ -88,6 +138,47 @@
   function handleMouseUp(e: MouseEvent) {
     if (isPanning) {
       isPanning = false;
+      return;
+    }
+
+    if (isBoxSelecting) {
+      isBoxSelecting = false;
+
+      // Find nodes that intersect the selection box
+      const r = boxRect;
+      if (r.width < 3 && r.height < 3) {
+        // Tiny box = just a click, deselect handled in mouseDown
+        return;
+      }
+
+      const hits: string[] = [];
+      for (const node of graphState.nodes) {
+        const nh = getNodeHeight(node);
+        // Check AABB intersection
+        if (
+          node.x < r.x + r.width &&
+          node.x + NODE_WIDTH > r.x &&
+          node.y < r.y + r.height &&
+          node.y + nh > r.y
+        ) {
+          hits.push(node.instanceId);
+        }
+      }
+
+      if (e.shiftKey) {
+        // Add to existing selection
+        const combined = new Set(graphState.selectedNodeIds);
+        for (const id of hits) combined.add(id);
+        selectNodes([...combined]);
+      } else {
+        selectNodes(hits);
+      }
+      return;
+    }
+
+    // Cancel pending connection if released on empty canvas (not on an input port)
+    if (graphState.pendingConnection) {
+      cancelConnection();
     }
   }
 
@@ -95,6 +186,16 @@
     if (e.code === "Space" && !(e.target instanceof HTMLInputElement)) {
       e.preventDefault();
       spaceHeld = true;
+    }
+    if (e.key === "Escape") {
+      if (graphState.pendingConnection) {
+        cancelConnection();
+      } else if (isBoxSelecting) {
+        isBoxSelecting = false;
+      } else {
+        selectNode(null);
+        selectConnection(null);
+      }
     }
   }
 
@@ -178,9 +279,9 @@
       </pattern>
     </defs>
 
-    <rect width="100%" height="100%" fill="var(--bg-primary)" />
-    <rect width="100%" height="100%" fill="url(#grid-small)" />
-    <rect width="100%" height="100%" fill="url(#grid-large)" />
+    <rect class="canvas-bg" width="100%" height="100%" fill="var(--bg-primary)" />
+    <rect class="canvas-bg" width="100%" height="100%" fill="url(#grid-small)" />
+    <rect class="canvas-bg" width="100%" height="100%" fill="url(#grid-large)" />
 
     <!-- Transformed group for pan/zoom -->
     <g transform="translate({panX}, {panY}) scale({zoom})">
@@ -213,6 +314,21 @@
       {#each graphState.nodes as node (node.instanceId)}
         <GraphNode {node} {zoom} />
       {/each}
+
+      <!-- Box selection rectangle -->
+      {#if isBoxSelecting && boxRect.width > 1}
+        <rect
+          x={boxRect.x}
+          y={boxRect.y}
+          width={boxRect.width}
+          height={boxRect.height}
+          fill="rgba(74, 158, 255, 0.08)"
+          stroke="var(--accent)"
+          stroke-width={1.5 / zoom}
+          stroke-dasharray="{4 / zoom} {3 / zoom}"
+          rx={3 / zoom}
+        />
+      {/if}
     </g>
   </svg>
 </div>
