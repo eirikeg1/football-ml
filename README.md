@@ -2,6 +2,9 @@
 
 A modular machine learning pipeline for predicting football match statistics and outcomes. Built for experimentation — components can be swapped, reconfigured, and extended independently.
 
+## Pipeline Editor
+![Pipeline editor screenshot](image.png)
+
 ## Architecture
 
 The pipeline is organized into five layers, each with swappable modules behind clean interfaces:
