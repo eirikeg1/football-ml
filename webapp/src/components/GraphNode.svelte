@@ -9,7 +9,18 @@
     startConnection,
     finishConnection,
   } from "../lib/state.svelte";
-  import { CATEGORY_COLORS, type NodeInstance } from "../lib/types";
+  import { CATEGORY_COLORS, type NodeInstance, type PortDef } from "../lib/types";
+
+  const PORT_COLORS: Record<string, string> = {
+    data: "var(--port-data)",
+    embedding: "var(--port-embedding)",
+    tensor: "var(--port-tensor)",
+    graph: "var(--port-graph)",
+  };
+
+  function portColor(port: PortDef): string {
+    return PORT_COLORS[port.dataType] ?? "var(--port-embedding)";
+  }
 
   interface Props {
     node: NodeInstance;
@@ -234,7 +245,7 @@
       cx="0"
       cy={getPortY(i)}
       r="5"
-      fill="var(--port-embedding)"
+      fill={portColor(port)}
       stroke="var(--bg-primary)"
       stroke-width="2"
       style="cursor: pointer; pointer-events: all;"
@@ -247,7 +258,7 @@
       cx={NODE_WIDTH}
       cy={getPortY(i)}
       r="5"
-      fill="var(--port-embedding)"
+      fill={portColor(port)}
       stroke="var(--bg-primary)"
       stroke-width="2"
       style="cursor: pointer; pointer-events: all;"

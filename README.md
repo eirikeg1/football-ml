@@ -3,36 +3,7 @@
 A modular machine learning pipeline for predicting football match statistics and outcomes. Built for experimentation — components can be swapped, reconfigured, and extended independently.
 
 ## Pipeline Editor
-![Pipeline editor screenshot](image.png)
-
-## Architecture
-
-The pipeline is organized into five layers, each with swappable modules behind clean interfaces:
-
-```
-Layer 1: Feature Extractors          Layer 2: Composition       Layer 3: Fusion
-┌─────────────────────────┐         ┌──────────────────┐       ┌─────────────────────┐
-│ PlayerProfileEncoder    │───┐     │                  │       │                     │
-│ PlayerFormEncoder       │───┤     │   LineupGNN      │──────▶│  TransformerFusion  │
-│ TeamPerformanceEncoder  │───┤────▶│   (PyG)          │       │  (or HybridFusion)  │
-│ MatchContextEncoder     │───┘     │                  │       │                     │
-└─────────────────────────┘         └──────────────────┘       └────────┬────────────┘
-                                                                        │
-                                                                        ▼
-                                                        Layer 4: Temporal Model
-                                                       ┌──────────────────────┐
-                                                       │     GRU Temporal     │
-                                                       └────────┬─────────────┘
-                                                                │
-                                                                ▼
-                                                       Layer 5: Prediction Heads
-                                                       ┌──────────────────────┐
-                                                       │ MatchOutcomeHead     │
-                                                       │ ScorelineHead        │
-                                                       │ PlayerStatHead       │
-                                                       │ MatchStatHead        │
-                                                       └──────────────────────┘
-```
+![Pipeline editor screenshot](resources/image.png)
 
 ## Setup
 

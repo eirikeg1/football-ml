@@ -16,6 +16,8 @@
   --border-active: #4a6fa5;
 
   /* Category colors */
+  --color-data-sources: #59c97a;
+  --color-augmentation: #c9b643;
   --color-feature-extractors: #4a9eff;
   --color-composition: #4ecdc4;
   --color-fusion: #f4845f;
@@ -27,6 +29,7 @@
   --accent-hover: #6ab0ff;
 
   /* Port colors */
+  --port-data: #59c97a;
   --port-embedding: #4ecdc4;
   --port-tensor: #f4845f;
   --port-graph: #9b72cf;

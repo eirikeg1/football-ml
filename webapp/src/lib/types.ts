@@ -1,4 +1,6 @@
 export type Category =
+  | "data_sources"
+  | "augmentation"
   | "feature_extractors"
   | "composition"
   | "fusion"
@@ -8,7 +10,7 @@ export type Category =
 export interface PortDef {
   name: string;
   type: "input" | "output";
-  dataType: "embedding" | "tensor" | "graph";
+  dataType: "data" | "embedding" | "tensor" | "graph";
   multi?: boolean; // accepts multiple connections
 }
 
@@ -53,6 +55,8 @@ export interface PendingConnection {
 }
 
 export const CATEGORY_COLORS: Record<Category, string> = {
+  data_sources: "var(--color-data-sources)",
+  augmentation: "var(--color-augmentation)",
   feature_extractors: "var(--color-feature-extractors)",
   composition: "var(--color-composition)",
   fusion: "var(--color-fusion)",
@@ -61,6 +65,8 @@ export const CATEGORY_COLORS: Record<Category, string> = {
 };
 
 export const CATEGORY_LABELS: Record<Category, string> = {
+  data_sources: "Data Sources",
+  augmentation: "Augmentation",
   feature_extractors: "Feature Extractors",
   composition: "Composition",
   fusion: "Fusion",

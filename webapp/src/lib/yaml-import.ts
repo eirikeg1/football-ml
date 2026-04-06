@@ -9,17 +9,21 @@ import type { Category } from "./types";
 
 // Layout constants for auto-placement by layer
 const LAYER_X: Record<Category, number> = {
-  feature_extractors: 50,
-  composition: 350,
-  fusion: 650,
-  temporal: 950,
-  heads: 1250,
+  data_sources: 50,
+  augmentation: 350,
+  feature_extractors: 650,
+  composition: 950,
+  fusion: 1250,
+  temporal: 1550,
+  heads: 1850,
 };
 
 const START_Y = 50;
 const NODE_SPACING_Y = 200;
 
 interface YamlConfig {
+  data_sources?: Record<string, Record<string, unknown>>;
+  augmentation?: Record<string, Record<string, unknown>[] | Record<string, unknown>>;
   feature_extractors?: Record<string, Record<string, unknown>>;
   composition?: Record<string, Record<string, unknown>>;
   fusion?: Record<string, unknown>;
@@ -64,6 +68,23 @@ export function importYaml(text: string): void {
     return node.instanceId;
   }
 
+  // Data sources
+  if (config.data_sources) {
+    for (const [key, params] of Object.entries(config.data_sources)) {
+      placeNode(key, "data_sources", params);
+    }
+  }
+
+  // Augmentation
+  if (config.augmentation) {
+    for (const [key, value] of Object.entries(config.augmentation)) {
+      const items = Array.isArray(value) ? value : [value];
+      for (const params of items) {
+        placeNode(key, "augmentation", params);
+      }
+    }
+  }
+
   // Feature extractors
   if (config.feature_extractors) {
     for (const [key, params] of Object.entries(config.feature_extractors)) {
@@ -104,11 +125,44 @@ export function importYaml(text: string): void {
   }
 
   // Auto-connect layers in order
+  const dataSources = createdNodes["data_sources"] || [];
+  const augmentations = createdNodes["augmentation"] || [];
   const extractors = createdNodes["feature_extractors"] || [];
   const compositions = createdNodes["composition"] || [];
   const fusions = createdNodes["fusion"] || [];
   const temporals = createdNodes["temporal"] || [];
   const heads = createdNodes["heads"] || [];
+
+  // Data sources → augmentation (if present), or → feature extractors
+  const dataTargets = augmentations.length > 0 ? augmentations : extractors;
+  for (const ds of dataSources) {
+    const dsDef = NODE_REGISTRY.find((n) => n.id === ds.defId);
+    const dsOutputPort = dsDef?.ports.find((p) => p.type === "output");
+    if (!dsOutputPort) continue;
+    for (const target of dataTargets) {
+      const targetDef = NODE_REGISTRY.find((n) => n.id === target.defId);
+      const inputPort = targetDef?.ports.find((p) => p.type === "input");
+      if (inputPort) {
+        addConnection(ds.instanceId, dsOutputPort.name, target.instanceId, inputPort.name);
+      }
+    }
+  }
+
+  // Augmentation → feature extractors
+  if (augmentations.length > 0 && extractors.length > 0) {
+    for (const aug of augmentations) {
+      const augDef = NODE_REGISTRY.find((n) => n.id === aug.defId);
+      const augOutput = augDef?.ports.find((p) => p.type === "output");
+      if (!augOutput) continue;
+      for (const ext of extractors) {
+        const extDef = NODE_REGISTRY.find((n) => n.id === ext.defId);
+        const inputPort = extDef?.ports.find((p) => p.type === "input");
+        if (inputPort) {
+          addConnection(aug.instanceId, augOutput.name, ext.instanceId, inputPort.name);
+        }
+      }
+    }
+  }
 
   // Feature extractors → composition (if present), or → fusion
   const nextLayer =

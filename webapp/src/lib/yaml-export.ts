@@ -3,6 +3,8 @@ import type { NodeInstance, Connection } from "./types";
 import { getNodeDef } from "./registry";
 
 interface YamlConfig {
+  data_sources?: Record<string, Record<string, unknown>>;
+  augmentation?: Record<string, Record<string, unknown>[]>;
   feature_extractors?: Record<string, Record<string, unknown>>;
   composition?: Record<string, Record<string, unknown>>;
   fusion?: Record<string, unknown>;
@@ -16,6 +18,9 @@ export function exportYaml(
 ): string {
   const config: YamlConfig = {};
 
+  // Track augmentation node instance IDs to export connections
+  const augNodes: { instanceId: string; defId: string; params: Record<string, unknown> }[] = [];
+
   for (const node of nodes) {
     const def = getNodeDef(node.defId);
     if (!def) continue;
@@ -23,6 +28,15 @@ export function exportYaml(
     const params = { ...node.params };
 
     switch (def.category) {
+      case "data_sources":
+        if (!config.data_sources) config.data_sources = {};
+        config.data_sources[def.id] = params;
+        break;
+
+      case "augmentation":
+        augNodes.push({ instanceId: node.instanceId, defId: def.id, params });
+        break;
+
       case "feature_extractors":
         if (!config.feature_extractors) config.feature_extractors = {};
         config.feature_extractors[def.id] = params;
@@ -45,6 +59,17 @@ export function exportYaml(
         if (!config.heads) config.heads = {};
         config.heads[def.id] = params;
         break;
+    }
+  }
+
+  // Export augmentation nodes grouped by type, preserving order
+  if (augNodes.length > 0) {
+    config.augmentation = {};
+    for (const aug of augNodes) {
+      if (!config.augmentation[aug.defId]) {
+        config.augmentation[aug.defId] = [];
+      }
+      config.augmentation[aug.defId].push(aug.params);
     }
   }
 
