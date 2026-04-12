@@ -126,7 +126,9 @@ def to_hetero_graph(
     relationships: list[RelationshipMeta],
     node_types: list[dict] | None = None,
     edge_types: list[dict] | None = None,
-):
+    add_reverse_edges: bool = False,
+    custom_features: dict[str, torch.Tensor] | None = None,
+) -> tuple:
     """Build a PyTorch Geometric HeteroData object.
 
     Each selected table becomes a node type. Each relationship becomes
@@ -139,13 +141,22 @@ def to_hetero_graph(
             If None, all tables become node types.
         edge_types: list of dicts with "relationship" index and "directed" flag.
             If None, all relationships become edge types.
+        add_reverse_edges: if True, add reverse edges for bidirectional
+            message passing (required for HGTConv).
+        custom_features: optional pre-computed feature tensors per node type.
+            If provided for a node type, these are used instead of auto-extracting
+            numeric columns from the DataFrame.
 
     Returns:
-        A torch_geometric.data.HeteroData object.
+        Tuple of (HeteroData, metadata, id_maps) where:
+        - HeteroData: the graph object
+        - metadata: (node_types_list, edge_types_list) tuple for HGTConv
+        - id_maps: dict mapping table_name -> {original_id -> node_index}
     """
     from torch_geometric.data import HeteroData
 
     data = HeteroData()
+    custom_features = custom_features or {}
 
     # Determine which tables to use as node types
     if node_types:
@@ -166,30 +177,38 @@ def to_hetero_graph(
             id_maps[table_name] = {
                 val: idx for idx, val in enumerate(df["id"].values)
             }
-        else:
-            id_maps[table_name] = {idx: idx for idx in range(len(df))}
-
-        # Build feature tensor
-        if feature_cols:
-            numeric = df[
-                [c for c in feature_cols if c in df.columns]
-            ].select_dtypes(include=["number"])
-        else:
-            numeric = df.select_dtypes(include=["number"])
-            # Drop id columns from features
-            id_cols = [c for c in numeric.columns if c == "id" or c.endswith("_id")]
-            numeric = numeric.drop(columns=id_cols, errors="ignore")
-
-        if not numeric.empty:
-            data[table_name].x = torch.tensor(
-                numeric.fillna(0).values, dtype=torch.float32
+            data[table_name].node_id = torch.tensor(
+                df["id"].values, dtype=torch.long
             )
         else:
-            data[table_name].x = torch.zeros((len(df), 1), dtype=torch.float32)
+            id_maps[table_name] = {idx: idx for idx in range(len(df))}
+            data[table_name].node_id = torch.arange(len(df), dtype=torch.long)
+
+        # Use custom features if provided, otherwise auto-extract
+        if table_name in custom_features:
+            data[table_name].x = custom_features[table_name]
+        else:
+            if feature_cols:
+                numeric = df[
+                    [c for c in feature_cols if c in df.columns]
+                ].select_dtypes(include=["number"])
+            else:
+                numeric = df.select_dtypes(include=["number"])
+                id_cols = [c for c in numeric.columns if c == "id" or c.endswith("_id")]
+                numeric = numeric.drop(columns=id_cols, errors="ignore")
+
+            if not numeric.empty:
+                data[table_name].x = torch.tensor(
+                    numeric.fillna(0).values, dtype=torch.float32
+                )
+            else:
+                data[table_name].x = torch.zeros((len(df), 1), dtype=torch.float32)
 
         data[table_name].num_nodes = len(df)
 
     # Build edges from relationships
+    all_edge_types: list[tuple[str, str, str]] = []
+
     for rel in relationships:
         if rel.from_table not in id_maps or rel.to_table not in id_maps:
             continue
@@ -211,8 +230,21 @@ def to_hetero_graph(
 
         if src_indices:
             edge_type = (rel.from_table, f"{rel.from_column}_to_{rel.to_column}", rel.to_table)
-            data[edge_type].edge_index = torch.tensor(
+            edge_tensor = torch.tensor(
                 [src_indices, dst_indices], dtype=torch.long
             )
+            data[edge_type].edge_index = edge_tensor
+            all_edge_types.append(edge_type)
 
-    return data
+            # Add reverse edge for bidirectional message passing
+            if add_reverse_edges:
+                rev_edge_type = (rel.to_table, f"rev_{rel.from_column}_to_{rel.to_column}", rel.from_table)
+                data[rev_edge_type].edge_index = torch.tensor(
+                    [dst_indices, src_indices], dtype=torch.long
+                )
+                all_edge_types.append(rev_edge_type)
+
+    node_types_list = list(selected_tables.keys())
+    metadata = (node_types_list, all_edge_types)
+
+    return data, metadata, id_maps

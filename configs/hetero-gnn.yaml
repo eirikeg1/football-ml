@@ -1,0 +1,120 @@
+nodes:
+  sqlite_source_1:
+    type: sqlite_source
+    position: [50, 150]
+    params:
+      db_path: ~/Data/football/matches/football.db
+    config:
+      dbPath: ~/Data/football/matches/football.db
+      tables:
+        - name: matches
+          included: true
+          columns:
+            - {name: id, dataType: integer, included: true, role: key}
+            - {name: competition_id, dataType: integer, included: true, role: key}
+            - {name: home_team_id, dataType: integer, included: true, role: key}
+            - {name: away_team_id, dataType: integer, included: true, role: key}
+            - {name: kickoff_time, dataType: integer, included: true, role: feature}
+            - {name: status, dataType: text, included: true, role: feature}
+            - {name: home_score, dataType: integer, included: true, role: label}
+            - {name: away_score, dataType: integer, included: true, role: label}
+            - {name: matchday, dataType: integer, included: true, role: feature}
+            - {name: venue, dataType: text, included: true, role: feature}
+        - name: match_stats
+          included: true
+          columns:
+            - {name: id, dataType: integer, included: true, role: key}
+            - {name: match_id, dataType: integer, included: true, role: key}
+            - {name: team_id, dataType: integer, included: true, role: key}
+            - {name: possession, dataType: real, included: true, role: feature}
+            - {name: pass_accuracy, dataType: real, included: true, role: feature}
+            - {name: total_passes, dataType: integer, included: true, role: feature}
+            - {name: shots, dataType: integer, included: true, role: feature}
+            - {name: shots_on_target, dataType: integer, included: true, role: feature}
+            - {name: corners, dataType: integer, included: true, role: feature}
+            - {name: fouls, dataType: integer, included: true, role: feature}
+            - {name: yellow_cards, dataType: integer, included: true, role: feature}
+            - {name: red_cards, dataType: integer, included: true, role: feature}
+            - {name: offsides, dataType: integer, included: true, role: feature}
+            - {name: saves, dataType: integer, included: true, role: feature}
+        - name: match_events
+          included: true
+          columns:
+            - {name: id, dataType: integer, included: true, role: key}
+            - {name: match_id, dataType: integer, included: true, role: key}
+            - {name: team_id, dataType: integer, included: true, role: key}
+            - {name: minute, dataType: integer, included: true, role: feature}
+            - {name: extra_minute, dataType: integer, included: true, role: feature}
+            - {name: event_type, dataType: text, included: true, role: feature}
+            - {name: player_name, dataType: text, included: true, role: feature}
+        - name: teams
+          included: true
+          columns:
+            - {name: id, dataType: integer, included: true, role: key}
+            - {name: name, dataType: text, included: true, role: feature}
+            - {name: country, dataType: text, included: true, role: feature}
+        - name: competitions
+          included: true
+          columns:
+            - {name: id, dataType: integer, included: true, role: key}
+            - {name: name, dataType: text, included: true, role: feature}
+            - {name: country, dataType: text, included: true, role: feature}
+      relationships:
+        - {id: fk_0, fromTable: match_stats, fromColumn: match_id, toTable: matches, toColumn: id, type: many_to_one, autoDetected: true}
+        - {id: fk_1, fromTable: match_stats, fromColumn: team_id, toTable: teams, toColumn: id, type: many_to_one, autoDetected: true}
+        - {id: fk_2, fromTable: match_events, fromColumn: match_id, toTable: matches, toColumn: id, type: many_to_one, autoDetected: true}
+        - {id: fk_3, fromTable: match_events, fromColumn: team_id, toTable: teams, toColumn: id, type: many_to_one, autoDetected: true}
+        - {id: fk_4, fromTable: matches, fromColumn: home_team_id, toTable: teams, toColumn: id, type: many_to_one, autoDetected: true}
+        - {id: fk_5, fromTable: matches, fromColumn: away_team_id, toTable: teams, toColumn: id, type: many_to_one, autoDetected: true}
+        - {id: fk_6, fromTable: matches, fromColumn: competition_id, toTable: competitions, toColumn: id, type: many_to_one, autoDetected: true}
+
+  hetero_gnn_1:
+    type: hetero_gnn
+    position: [450, 150]
+    params:
+      d_model: 128
+      num_heads: 8
+      num_layers: 3
+      dropout: 0.2
+
+  gru_temporal_1:
+    type: gru_temporal
+    position: [850, 150]
+    params:
+      input_dim: 256
+      hidden_dim: 128
+      output_dim: 128
+      num_layers: 1
+
+  match_outcome_1:
+    type: match_outcome
+    position: [1250, 50]
+    params:
+      input_dim: 128
+      num_classes: 3
+
+  scoreline_1:
+    type: scoreline
+    position: [1250, 200]
+    params:
+      input_dim: 128
+      max_goals: 10
+
+  match_stat_1:
+    type: match_stat
+    position: [1250, 350]
+    params:
+      input_dim: 128
+      num_stats: 8
+
+connections:
+  - from: sqlite_source_1.dataset
+    to: hetero_gnn_1.dataset
+  - from: hetero_gnn_1.match_repr
+    to: gru_temporal_1.sequence
+  - from: gru_temporal_1.temporal_state
+    to: match_outcome_1.temporal_state
+  - from: gru_temporal_1.temporal_state
+    to: scoreline_1.temporal_state
+  - from: gru_temporal_1.temporal_state
+    to: match_stat_1.temporal_state

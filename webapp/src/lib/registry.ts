@@ -460,6 +460,24 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
   },
 
+  {
+    id: "hetero_gnn",
+    label: "Heterogeneous GNN",
+    category: "composition",
+    description:
+      "Heterogeneous Graph Transformer (HGT) over relational data tables. Tables become node types, FK relationships become edges. Learns entity representations through message passing across the full relational graph.\n\nTeams and competitions use learned embeddings. Match stats and events provide numeric features.\n\nProduces match representations by concatenating home + away team embeddings.\n\nInput: Multi-table dataset.\nOutput: Match embedding (2 x d_model dimensions).",
+    ports: [
+      { name: "dataset", type: "input", dataType: "dataset" },
+      { name: "match_repr", type: "output", dataType: "embedding" },
+    ],
+    params: [
+      { name: "d_model", type: "number", default: 128 },
+      { name: "num_heads", type: "number", default: 8 },
+      { name: "num_layers", type: "number", default: 3 },
+      { name: "dropout", type: "number", default: 0.2 },
+    ],
+  },
+
   // Fusion
   {
     id: "transformer_fusion",

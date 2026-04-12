@@ -53,8 +53,28 @@ class LineupGNNConfig:
 
 
 @dataclass
+class HeteroGNNConfig:
+    d_model: int = 128
+    num_heads: int = 8
+    num_layers: int = 3
+    dropout: float = 0.2
+    include_events: bool = False
+    team_embed_dim: int = 128
+    competition_embed_dim: int = 32
+    readout_dim: int = 256  # 2 * d_model (home + away concat)
+
+
+@dataclass
+class SnapshotConfig:
+    strategy: str = "per_matchday"
+    min_history_matches: int = 10
+    seq_len: int = 10
+
+
+@dataclass
 class CompositionConfig:
     lineup_gnn: LineupGNNConfig = field(default_factory=LineupGNNConfig)
+    hetero_gnn: HeteroGNNConfig = field(default_factory=HeteroGNNConfig)
 
 
 @dataclass
@@ -158,6 +178,7 @@ class PipelineConfig:
     fusion: FusionConfig = field(default_factory=FusionConfig)
     temporal: TemporalConfig = field(default_factory=TemporalConfig)
     heads: HeadsConfig = field(default_factory=HeadsConfig)
+    snapshot: SnapshotConfig = field(default_factory=SnapshotConfig)
 
 
 def load_config(path: str | Path) -> PipelineConfig:
