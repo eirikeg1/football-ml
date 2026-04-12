@@ -104,10 +104,29 @@ export function addConnection(
   );
   if (exists) return null;
 
-  // Check if the target port already has a connection (unless multi)
+  // Validate port data type compatibility
+  const fromNodeInstance = graphState.nodes.find(
+    (n) => n.instanceId === fromNode
+  );
   const toNodeInstance = graphState.nodes.find(
     (n) => n.instanceId === toNode
   );
+  if (fromNodeInstance && toNodeInstance) {
+    const fromDef = getNodeDef(fromNodeInstance.defId);
+    const toDef = getNodeDef(toNodeInstance.defId);
+    const fromPortDef = fromDef?.ports.find(
+      (p) => p.name === fromPort && p.type === "output"
+    );
+    const toPortDef = toDef?.ports.find(
+      (p) => p.name === toPort && p.type === "input"
+    );
+    // Reject incompatible data types
+    if (fromPortDef && toPortDef && fromPortDef.dataType !== toPortDef.dataType) {
+      return null;
+    }
+  }
+
+  // Check if the target port already has a connection (unless multi)
   if (toNodeInstance) {
     const toDef = getNodeDef(toNodeInstance.defId);
     const portDef = toDef?.ports.find(
@@ -213,4 +232,20 @@ export function finishConnection(toNode: string, toPort: string): void {
 
 export function cancelConnection(): void {
   graphState.pendingConnection = null;
+}
+
+export function updateDetailConfig(
+  instanceId: string,
+  config: Record<string, unknown>
+): void {
+  const node = graphState.nodes.find((n) => n.instanceId === instanceId);
+  if (node) {
+    node.detailConfig = config;
+  }
+}
+
+export function getSelectedNode(): NodeInstance | null {
+  if (graphState.selectedNodeIds.size !== 1) return null;
+  const id = [...graphState.selectedNodeIds][0];
+  return graphState.nodes.find((n) => n.instanceId === id) ?? null;
 }

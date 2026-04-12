@@ -108,7 +108,49 @@ class HeadsConfig:
 
 
 @dataclass
+class ColumnConfig:
+    name: str = ""
+    role: str = "feature"  # "feature", "label", "key", "ignore"
+
+
+@dataclass
+class TableConfig:
+    name: str = ""
+    columns: list[ColumnConfig] = field(default_factory=list)
+
+
+@dataclass
+class RelationshipConfig:
+    from_table: str = ""
+    from_column: str = ""
+    to_table: str = ""
+    to_column: str = ""
+    rel_type: str = "many_to_one"
+
+
+@dataclass
+class DataSourceConfig:
+    type: str = "sqlite"  # "sqlite" | "csv"
+    path: str = ""
+    tables: list[TableConfig] = field(default_factory=list)
+    relationships: list[RelationshipConfig] = field(default_factory=list)
+
+
+@dataclass
+class MaterializationConfig:
+    strategy: str = "flatten"  # "flatten" | "aligned" | "heterogeneous_graph"
+    join_order: list[str] = field(default_factory=list)
+    join_type: str = "inner"
+    node_types: list[dict] = field(default_factory=list)
+    edge_types: list[dict] = field(default_factory=list)
+
+
+@dataclass
 class PipelineConfig:
+    data_sources: list[DataSourceConfig] = field(default_factory=list)
+    materialization: MaterializationConfig = field(
+        default_factory=MaterializationConfig
+    )
     feature_extractors: FeatureExtractorsConfig = field(
         default_factory=FeatureExtractorsConfig
     )

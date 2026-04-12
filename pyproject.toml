@@ -12,6 +12,7 @@ dependencies = [
     "torch-geometric>=2.4",
     "pyyaml>=6.0",
     "dacite>=1.8",
+    "pandas>=2.0",
 ]
 
 [project.optional-dependencies]

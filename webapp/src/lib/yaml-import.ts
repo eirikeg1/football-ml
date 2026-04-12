@@ -1,13 +1,91 @@
 import yaml from "js-yaml";
-import {
-  clearGraph,
-  addNode,
-  addConnection,
-} from "./state.svelte";
+import { clearGraph, addNode, addConnection } from "./state.svelte";
 import { NODE_REGISTRY } from "./registry";
 import type { Category } from "./types";
 
-// Layout constants for auto-placement by layer
+// ── Graph-native format ─────────────────────────────────────────────
+
+interface YamlNode {
+  type: string;
+  position?: [number, number];
+  params?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+}
+
+interface YamlConnection {
+  from: string;
+  to: string;
+}
+
+interface YamlGraph {
+  nodes: Record<string, YamlNode>;
+  connections?: YamlConnection[];
+}
+
+// Auto-layout: position nodes by category column, stacked vertically
+function autoPosition(defId: string, categoryCounts: Record<string, number>): [number, number] {
+  const def = NODE_REGISTRY.find((n) => n.id === defId);
+  const category = def?.category ?? "feature_extractors";
+  const col = LAYER_X[category] ?? 650;
+  const count = categoryCounts[category] || 0;
+  categoryCounts[category] = count + 1;
+  return [col, START_Y + count * NODE_SPACING_Y];
+}
+
+function importGraphFormat(graph: YamlGraph): void {
+  clearGraph();
+
+  const stableToInstance = new Map<string, string>();
+  const categoryCounts: Record<string, number> = {};
+
+  for (const [stableId, yamlNode] of Object.entries(graph.nodes)) {
+    const [x, y] = yamlNode.position ?? autoPosition(yamlNode.type, categoryCounts);
+    const node = addNode(yamlNode.type, x, y);
+    if (!node) continue;
+
+    for (const [key, val] of Object.entries(yamlNode.params ?? {})) {
+      node.params[key] = val as number | string;
+    }
+
+    if (yamlNode.config && Object.keys(yamlNode.config).length > 0) {
+      node.detailConfig = yamlNode.config;
+    }
+
+    stableToInstance.set(stableId, node.instanceId);
+  }
+
+  for (const conn of graph.connections ?? []) {
+    const [fromId, fromPort] = splitRef(conn.from);
+    const [toId, toPort] = splitRef(conn.to);
+    const fromInstance = stableToInstance.get(fromId);
+    const toInstance = stableToInstance.get(toId);
+    if (fromInstance && toInstance && fromPort && toPort) {
+      addConnection(fromInstance, fromPort, toInstance, toPort);
+    }
+  }
+}
+
+function splitRef(ref: string): [string, string] {
+  const dot = ref.lastIndexOf(".");
+  if (dot === -1) return [ref, ""];
+  return [ref.slice(0, dot), ref.slice(dot + 1)];
+}
+
+// ── Legacy pipeline config format (backwards compat) ────────────────
+
+interface LegacyConfig {
+  data_sources?: Record<string, Record<string, unknown>>;
+  augmentation?: Record<
+    string,
+    Record<string, unknown>[] | Record<string, unknown>
+  >;
+  feature_extractors?: Record<string, Record<string, unknown>>;
+  composition?: Record<string, Record<string, unknown>>;
+  fusion?: Record<string, unknown>;
+  temporal?: Record<string, unknown>;
+  heads?: Record<string, Record<string, unknown>>;
+}
+
 const LAYER_X: Record<Category, number> = {
   data_sources: 50,
   augmentation: 350,
@@ -21,25 +99,13 @@ const LAYER_X: Record<Category, number> = {
 const START_Y = 50;
 const NODE_SPACING_Y = 200;
 
-interface YamlConfig {
-  data_sources?: Record<string, Record<string, unknown>>;
-  augmentation?: Record<string, Record<string, unknown>[] | Record<string, unknown>>;
-  feature_extractors?: Record<string, Record<string, unknown>>;
-  composition?: Record<string, Record<string, unknown>>;
-  fusion?: Record<string, unknown>;
-  temporal?: Record<string, unknown>;
-  heads?: Record<string, Record<string, unknown>>;
-}
-
-export function importYaml(text: string): void {
-  const config = yaml.load(text) as YamlConfig;
-  if (!config) return;
-
+function importLegacyFormat(config: LegacyConfig): void {
   clearGraph();
 
-  // Track created nodes by category for auto-connection
-  const createdNodes: Record<string, { instanceId: string; defId: string }[]> =
-    {};
+  const createdNodes: Record<
+    string,
+    { instanceId: string; defId: string }[]
+  > = {};
   const layerCounts: Record<string, number> = {};
 
   function placeNode(
@@ -56,26 +122,22 @@ export function importYaml(text: string): void {
     const node = addNode(defId, x, y);
     if (!node) return null;
 
-    // Apply params from YAML
     for (const [key, val] of Object.entries(params)) {
-      if (key === "type") continue; // type is used to select the module, not a param
+      if (key === "type") continue;
       node.params[key] = val as number | string;
     }
 
     if (!createdNodes[category]) createdNodes[category] = [];
     createdNodes[category].push({ instanceId: node.instanceId, defId });
-
     return node.instanceId;
   }
 
-  // Data sources
   if (config.data_sources) {
     for (const [key, params] of Object.entries(config.data_sources)) {
       placeNode(key, "data_sources", params);
     }
   }
 
-  // Augmentation
   if (config.augmentation) {
     for (const [key, value] of Object.entries(config.augmentation)) {
       const items = Array.isArray(value) ? value : [value];
@@ -85,21 +147,18 @@ export function importYaml(text: string): void {
     }
   }
 
-  // Feature extractors
   if (config.feature_extractors) {
     for (const [key, params] of Object.entries(config.feature_extractors)) {
       placeNode(key, "feature_extractors", params);
     }
   }
 
-  // Composition
   if (config.composition) {
     for (const [key, params] of Object.entries(config.composition)) {
       placeNode(key, "composition", params);
     }
   }
 
-  // Fusion
   if (config.fusion) {
     const fusionType = (config.fusion.type as string) || "transformer";
     const defId = `${fusionType}_fusion`;
@@ -108,7 +167,6 @@ export function importYaml(text: string): void {
     placeNode(defId, "fusion", params);
   }
 
-  // Temporal
   if (config.temporal) {
     const temporalType = (config.temporal.type as string) || "gru";
     const defId = `${temporalType}_temporal`;
@@ -117,14 +175,13 @@ export function importYaml(text: string): void {
     placeNode(defId, "temporal", params);
   }
 
-  // Heads
   if (config.heads) {
     for (const [key, params] of Object.entries(config.heads)) {
       placeNode(key, "heads", params);
     }
   }
 
-  // Auto-connect layers in order
+  // Heuristic auto-connect for legacy format
   const dataSources = createdNodes["data_sources"] || [];
   const augmentations = createdNodes["augmentation"] || [];
   const extractors = createdNodes["feature_extractors"] || [];
@@ -133,56 +190,48 @@ export function importYaml(text: string): void {
   const temporals = createdNodes["temporal"] || [];
   const heads = createdNodes["heads"] || [];
 
-  // Data sources → augmentation (if present), or → feature extractors
   const dataTargets = augmentations.length > 0 ? augmentations : extractors;
   for (const ds of dataSources) {
     const dsDef = NODE_REGISTRY.find((n) => n.id === ds.defId);
-    const dsOutputPort = dsDef?.ports.find((p) => p.type === "output");
-    if (!dsOutputPort) continue;
+    const dsOut = dsDef?.ports.find((p) => p.type === "output");
+    if (!dsOut) continue;
     for (const target of dataTargets) {
-      const targetDef = NODE_REGISTRY.find((n) => n.id === target.defId);
-      const inputPort = targetDef?.ports.find((p) => p.type === "input");
-      if (inputPort) {
-        addConnection(ds.instanceId, dsOutputPort.name, target.instanceId, inputPort.name);
-      }
+      const tDef = NODE_REGISTRY.find((n) => n.id === target.defId);
+      const tIn = tDef?.ports.find((p) => p.type === "input");
+      if (tIn)
+        addConnection(ds.instanceId, dsOut.name, target.instanceId, tIn.name);
     }
   }
 
-  // Augmentation → feature extractors
   if (augmentations.length > 0 && extractors.length > 0) {
     for (const aug of augmentations) {
-      const augDef = NODE_REGISTRY.find((n) => n.id === aug.defId);
-      const augOutput = augDef?.ports.find((p) => p.type === "output");
-      if (!augOutput) continue;
+      const aDef = NODE_REGISTRY.find((n) => n.id === aug.defId);
+      const aOut = aDef?.ports.find((p) => p.type === "output");
+      if (!aOut) continue;
       for (const ext of extractors) {
-        const extDef = NODE_REGISTRY.find((n) => n.id === ext.defId);
-        const inputPort = extDef?.ports.find((p) => p.type === "input");
-        if (inputPort) {
-          addConnection(aug.instanceId, augOutput.name, ext.instanceId, inputPort.name);
-        }
+        const eDef = NODE_REGISTRY.find((n) => n.id === ext.defId);
+        const eIn = eDef?.ports.find((p) => p.type === "input");
+        if (eIn)
+          addConnection(
+            aug.instanceId,
+            aOut.name,
+            ext.instanceId,
+            eIn.name
+          );
       }
     }
   }
 
-  // Feature extractors → composition (if present), or → fusion
-  const nextLayer =
-    compositions.length > 0 ? compositions : fusions;
+  const nextLayer = compositions.length > 0 ? compositions : fusions;
   for (const ext of extractors) {
     for (const target of nextLayer) {
-      const targetDef = NODE_REGISTRY.find((n) => n.id === target.defId);
-      const inputPort = targetDef?.ports.find((p) => p.type === "input");
-      if (inputPort) {
-        addConnection(
-          ext.instanceId,
-          "embedding",
-          target.instanceId,
-          inputPort.name
-        );
-      }
+      const tDef = NODE_REGISTRY.find((n) => n.id === target.defId);
+      const tIn = tDef?.ports.find((p) => p.type === "input");
+      if (tIn)
+        addConnection(ext.instanceId, "embedding", target.instanceId, tIn.name);
     }
   }
 
-  // Composition → fusion
   if (compositions.length > 0 && fusions.length > 0) {
     for (const comp of compositions) {
       for (const fus of fusions) {
@@ -196,14 +245,12 @@ export function importYaml(text: string): void {
     }
   }
 
-  // Fusion → temporal
   for (const fus of fusions) {
     for (const temp of temporals) {
       addConnection(fus.instanceId, "match_repr", temp.instanceId, "sequence");
     }
   }
 
-  // Temporal → heads
   for (const temp of temporals) {
     for (const head of heads) {
       addConnection(
@@ -214,4 +261,23 @@ export function importYaml(text: string): void {
       );
     }
   }
+}
+
+// ── Entry point ─────────────────────────────────────────────────────
+
+export function importYaml(text: string): void {
+  const data = yaml.load(text) as Record<string, unknown>;
+  if (!data) return;
+
+  // Detect format: graph-native has a "nodes" key with objects that have "type"
+  if (data.nodes && typeof data.nodes === "object" && !Array.isArray(data.nodes)) {
+    const firstNode = Object.values(data.nodes)[0] as Record<string, unknown> | undefined;
+    if (firstNode && "type" in firstNode) {
+      importGraphFormat(data as unknown as YamlGraph);
+      return;
+    }
+  }
+
+  // Fallback: legacy pipeline config format
+  importLegacyFormat(data as unknown as LegacyConfig);
 }

@@ -33,6 +33,7 @@
   --port-embedding: #4ecdc4;
   --port-tensor: #f4845f;
   --port-graph: #9b72cf;
+  --port-dataset: #e6a23c;
 
   /* Connection */
   --connection-color: #4a6fa5;
@@ -44,6 +45,7 @@
 
   /* Sizing */
   --sidebar-width: 240px;
+  --detail-panel-width: 320px;
   --toolbar-height: 48px;
   --node-width: 200px;
   --port-size: 12px;

@@ -2,78 +2,75 @@ import yaml from "js-yaml";
 import type { NodeInstance, Connection } from "./types";
 import { getNodeDef } from "./registry";
 
-interface YamlConfig {
-  data_sources?: Record<string, Record<string, unknown>>;
-  augmentation?: Record<string, Record<string, unknown>[]>;
-  feature_extractors?: Record<string, Record<string, unknown>>;
-  composition?: Record<string, Record<string, unknown>>;
-  fusion?: Record<string, unknown>;
-  temporal?: Record<string, unknown>;
-  heads?: Record<string, Record<string, unknown>>;
+interface YamlNode {
+  type: string;
+  position: [number, number];
+  params: Record<string, unknown>;
+  config?: Record<string, unknown>;
+}
+
+interface YamlConnection {
+  from: string;
+  to: string;
+}
+
+interface YamlGraph {
+  nodes: Record<string, YamlNode>;
+  connections: YamlConnection[];
 }
 
 export function exportYaml(
   nodes: NodeInstance[],
   connections: Connection[]
 ): string {
-  const config: YamlConfig = {};
-
-  // Track augmentation node instance IDs to export connections
-  const augNodes: { instanceId: string; defId: string; params: Record<string, unknown> }[] = [];
+  // Build stable IDs: defId_1, defId_2, etc.
+  const idCounters: Record<string, number> = {};
+  const instanceToStable = new Map<string, string>();
 
   for (const node of nodes) {
-    const def = getNodeDef(node.defId);
-    if (!def) continue;
+    const count = (idCounters[node.defId] || 0) + 1;
+    idCounters[node.defId] = count;
+    const stableId = `${node.defId}_${count}`;
+    instanceToStable.set(node.instanceId, stableId);
+  }
 
-    const params = { ...node.params };
+  // Build nodes map
+  const yamlNodes: Record<string, YamlNode> = {};
+  for (const node of nodes) {
+    const stableId = instanceToStable.get(node.instanceId)!;
+    const yamlNode: YamlNode = {
+      type: node.defId,
+      position: [Math.round(node.x), Math.round(node.y)],
+      params: { ...node.params },
+    };
+    if (
+      node.detailConfig &&
+      Object.keys(node.detailConfig).length > 0
+    ) {
+      yamlNode.config = node.detailConfig;
+    }
+    yamlNodes[stableId] = yamlNode;
+  }
 
-    switch (def.category) {
-      case "data_sources":
-        if (!config.data_sources) config.data_sources = {};
-        config.data_sources[def.id] = params;
-        break;
-
-      case "augmentation":
-        augNodes.push({ instanceId: node.instanceId, defId: def.id, params });
-        break;
-
-      case "feature_extractors":
-        if (!config.feature_extractors) config.feature_extractors = {};
-        config.feature_extractors[def.id] = params;
-        break;
-
-      case "composition":
-        if (!config.composition) config.composition = {};
-        config.composition[def.id] = params;
-        break;
-
-      case "fusion":
-        config.fusion = { type: def.id.replace("_fusion", ""), ...params };
-        break;
-
-      case "temporal":
-        config.temporal = { type: def.id.replace("_temporal", ""), ...params };
-        break;
-
-      case "heads":
-        if (!config.heads) config.heads = {};
-        config.heads[def.id] = params;
-        break;
+  // Build connections list
+  const yamlConnections: YamlConnection[] = [];
+  for (const conn of connections) {
+    const fromStable = instanceToStable.get(conn.fromNode);
+    const toStable = instanceToStable.get(conn.toNode);
+    if (fromStable && toStable) {
+      yamlConnections.push({
+        from: `${fromStable}.${conn.fromPort}`,
+        to: `${toStable}.${conn.toPort}`,
+      });
     }
   }
 
-  // Export augmentation nodes grouped by type, preserving order
-  if (augNodes.length > 0) {
-    config.augmentation = {};
-    for (const aug of augNodes) {
-      if (!config.augmentation[aug.defId]) {
-        config.augmentation[aug.defId] = [];
-      }
-      config.augmentation[aug.defId].push(aug.params);
-    }
-  }
+  const graph: YamlGraph = {
+    nodes: yamlNodes,
+    connections: yamlConnections,
+  };
 
-  return yaml.dump(config, {
+  return yaml.dump(graph, {
     indent: 2,
     lineWidth: -1,
     noRefs: true,

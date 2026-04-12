@@ -1,0 +1,750 @@
+{
+  "tables": [
+    {
+      "name": "backfill_progress",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "request_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "target_date",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "status",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "matches_found",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "details_fetched",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "error_message",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "completed_at",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "backfill_requests",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "action",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "from_date",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "to_date",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "status",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "created_at",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "started_at",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "completed_at",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "error_message",
+          "data_type": "text",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "competitions",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "name",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "code",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "country",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "competition_type",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "created_at",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "updated_at",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "lineups",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "match_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "team_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "player_name",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "player_number",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "position",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "is_starter",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "minutes_played",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "match_events",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "match_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "team_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "minute",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "extra_minute",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "event_type",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "player_name",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "secondary_player_name",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "detail",
+          "data_type": "text",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "match_stats",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "match_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "team_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "possession",
+          "data_type": "real",
+          "role": "feature"
+        },
+        {
+          "name": "pass_accuracy",
+          "data_type": "real",
+          "role": "feature"
+        },
+        {
+          "name": "total_passes",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "shots",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "shots_on_target",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "corners",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "fouls",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "yellow_cards",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "red_cards",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "offsides",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "saves",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "matches",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "competition_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "season_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "home_team_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "away_team_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "kickoff_time",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "status",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "home_score",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "away_score",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "matchday",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "round",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "venue",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "last_updated",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "cloud_synced",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "scrape_config",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "config_key",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "config_value",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "updated_at",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "scrape_queue",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "source",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "data_type",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "target_id",
+          "data_type": "text",
+          "role": "key"
+        },
+        {
+          "name": "target_params",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "priority",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "status",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "claimed_at",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "completed_at",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "error_message",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "created_at",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "seasons",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "competition_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "year",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "start_date",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "end_date",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "is_current",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "source_fetch_log",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "source",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "data_type",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "timestamp",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "success",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "latency_ms",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "records_count",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "error_message",
+          "data_type": "text",
+          "role": "feature"
+        }
+      ]
+    },
+    {
+      "name": "source_mappings",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "entity_type",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "internal_id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "source",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "source_id",
+          "data_type": "text",
+          "role": "key"
+        }
+      ]
+    },
+    {
+      "name": "staging_raw",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "source",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "data_type",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "source_id",
+          "data_type": "text",
+          "role": "key"
+        },
+        {
+          "name": "raw_json",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "fetched_at",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "processed",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "process_error",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "queue_item_id",
+          "data_type": "integer",
+          "role": "key"
+        }
+      ]
+    },
+    {
+      "name": "teams",
+      "columns": [
+        {
+          "name": "id",
+          "data_type": "integer",
+          "role": "key"
+        },
+        {
+          "name": "name",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "short_name",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "country",
+          "data_type": "text",
+          "role": "feature"
+        },
+        {
+          "name": "created_at",
+          "data_type": "integer",
+          "role": "feature"
+        },
+        {
+          "name": "updated_at",
+          "data_type": "integer",
+          "role": "feature"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from_table": "backfill_progress",
+      "from_column": "request_id",
+      "to_table": "backfill_requests",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "lineups",
+      "from_column": "team_id",
+      "to_table": "teams",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "lineups",
+      "from_column": "match_id",
+      "to_table": "matches",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "match_events",
+      "from_column": "team_id",
+      "to_table": "teams",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "match_events",
+      "from_column": "match_id",
+      "to_table": "matches",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "match_stats",
+      "from_column": "team_id",
+      "to_table": "teams",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "match_stats",
+      "from_column": "match_id",
+      "to_table": "matches",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "matches",
+      "from_column": "away_team_id",
+      "to_table": "teams",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "matches",
+      "from_column": "home_team_id",
+      "to_table": "teams",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "matches",
+      "from_column": "season_id",
+      "to_table": "seasons",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "matches",
+      "from_column": "competition_id",
+      "to_table": "competitions",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    },
+    {
+      "from_table": "seasons",
+      "from_column": "competition_id",
+      "to_table": "competitions",
+      "to_column": "id",
+      "rel_type": "many_to_one"
+    }
+  ]
+}

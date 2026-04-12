@@ -17,6 +17,7 @@
     embedding: "var(--port-embedding)",
     tensor: "var(--port-tensor)",
     graph: "var(--port-graph)",
+    dataset: "var(--port-dataset)",
   };
 
   function portColor(port: PortDef): string {
@@ -33,6 +34,7 @@
   let def = $derived(getNodeDef(node.defId)!);
   let isSelected = $derived(graphState.selectedNodeIds.has(node.instanceId));
   let categoryColor = $derived(CATEGORY_COLORS[def.category]);
+  let isImplemented = $derived(def.implemented !== false);
 
   let inputPorts = $derived(def.ports.filter((p) => p.type === "input"));
   let outputPorts = $derived(def.ports.filter((p) => p.type === "output"));
@@ -60,6 +62,13 @@
   let nodeStartX = 0;
   let nodeStartY = 0;
   let dragGroupStart: { id: string; x: number; y: number }[] = [];
+  let showInfo = $state(false);
+
+  function toggleInfo(e: MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    showInfo = !showInfo;
+  }
 
   function handleMouseDown(e: MouseEvent) {
     if ((e.target as HTMLElement).closest(".port, input, select")) return;
@@ -198,17 +207,30 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <g transform="translate({node.x - OVERFLOW_PAD}, {node.y - OVERFLOW_PAD})">
-  <foreignObject width={NODE_WIDTH + OVERFLOW_PAD * 2} height={totalHeight + OVERFLOW_PAD * 2}>
+  <foreignObject width={NODE_WIDTH + OVERFLOW_PAD * 2} height={totalHeight + OVERFLOW_PAD * 2} style="overflow: visible;">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="node"
       class:selected={isSelected}
+      class:not-implemented={!isImplemented}
       onmousedown={handleMouseDown}
       style="--cat-color: {categoryColor}; width: {NODE_WIDTH}px; margin: {OVERFLOW_PAD}px;"
     >
       <!-- Header -->
       <div class="node-header">
         <span class="node-title">{def.label}</span>
+        {#if !isImplemented}
+          <span class="not-impl-badge">Soon</span>
+        {/if}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <span
+          class="info-btn"
+          class:active={showInfo}
+          onmousedown={(e) => e.stopPropagation()}
+          onclick={toggleInfo}
+          title="Show module info"
+        >i</span>
       </div>
 
       <!-- Body -->
@@ -317,6 +339,29 @@
       onclick={(e) => { e.stopPropagation(); handleOutputPortClick(e, port.name); }}
     />
   {/each}
+
+  <!-- Info popover as separate foreignObject so it isn't clipped -->
+  {#if showInfo}
+    <foreignObject
+      x={NODE_WIDTH + OVERFLOW_PAD + 10}
+      y={0}
+      width="280"
+      height="400"
+      style="overflow: visible; pointer-events: none;"
+    >
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <div class="info-popover" onmousedown={(e) => e.stopPropagation()} style="pointer-events: auto;">
+        {#each def.description.split('\n') as line}
+          {#if line.trim() === ''}
+            <div class="info-gap"></div>
+          {:else}
+            <p class="info-line">{line}</p>
+          {/if}
+        {/each}
+      </div>
+    </foreignObject>
+  {/if}
 </g>
 
 <style>
@@ -324,11 +369,12 @@
     background: var(--bg-node);
     border: 1.5px solid var(--border-color);
     border-radius: var(--border-radius);
-    overflow: hidden;
+    overflow: visible;
     cursor: grab;
     user-select: none;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     transition: border-color 0.15s, box-shadow 0.15s;
+    position: relative;
   }
 
   .node:hover {
@@ -340,20 +386,103 @@
     box-shadow: 0 0 0 1px var(--cat-color), 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 
+  .node.not-implemented {
+    opacity: 0.55;
+  }
+
+  .node.not-implemented:hover {
+    opacity: 0.7;
+  }
+
+  .not-impl-badge {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
   .node:active {
     cursor: grabbing;
   }
 
   .node-header {
-    padding: 7px 12px;
+    padding: 7px 10px 7px 12px;
     background: color-mix(in srgb, var(--cat-color) 15%, var(--bg-node));
     border-bottom: 1px solid var(--border-color);
+    border-radius: var(--border-radius) var(--border-radius) 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
   }
 
   .node-title {
     font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .info-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--text-muted);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    font-style: italic;
+    font-family: "Georgia", "Times New Roman", serif;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    line-height: 1;
+  }
+
+  .info-btn:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .info-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(74, 158, 255, 0.1);
+  }
+
+  .info-popover {
+    width: 270px;
+    background: #16213e;
+    border: 1px solid #4a6fa5;
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    cursor: default;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+
+  .info-line {
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: #8892a4;
+    margin: 0 0 2px 0;
+  }
+
+  .info-gap {
+    height: 8px;
   }
 
   .node-body {

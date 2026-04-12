@@ -10,7 +10,7 @@ export type Category =
 export interface PortDef {
   name: string;
   type: "input" | "output";
-  dataType: "data" | "embedding" | "tensor" | "graph";
+  dataType: "data" | "embedding" | "tensor" | "graph" | "dataset";
   multi?: boolean; // accepts multiple connections
 }
 
@@ -21,12 +21,21 @@ export interface ParamDef {
   options?: string[];
 }
 
+export type DetailPanelType =
+  | "datasource_sqlite"
+  | "datasource_csv"
+  | "table_selector"
+  | "materialization";
+
 export interface NodeDef {
   id: string;
   label: string;
   category: Category;
+  description: string;
   ports: PortDef[];
   params: ParamDef[];
+  detailPanel?: DetailPanelType;
+  implemented?: boolean; // defaults to true; false shows "Coming soon" indicator
 }
 
 export interface NodeInstance {
@@ -35,6 +44,7 @@ export interface NodeInstance {
   x: number;
   y: number;
   params: Record<string, number | string>;
+  detailConfig?: Record<string, unknown>;
 }
 
 export interface Connection {
