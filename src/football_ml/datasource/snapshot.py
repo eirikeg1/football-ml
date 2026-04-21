@@ -30,6 +30,7 @@ class TrainingSample:
     home_score: int
     away_score: int
     match_id: int
+    date_key: int = 0
 
 
 class SnapshotBuilder:
@@ -83,11 +84,47 @@ class SnapshotBuilder:
         else:
             self._team_ids = set()
 
+        # Build canonical metadata from a full snapshot (all data) so that
+        # every snapshot has consistent node/edge type sets
+        full_tables = {
+            "matches": self.matches,
+            "match_stats": self.match_stats,
+            "teams": self.teams,
+            "competitions": self.competitions,
+        }
+        if self.hetero_config.include_events and not self.match_events.empty:
+            full_tables["match_events"] = self.match_events
+
+        _, self._canonical_metadata, _ = to_hetero_graph(
+            full_tables,
+            self.relationships,
+            add_reverse_edges=True,
+        )
+
     def _filter_tables(
         self, cutoff_time: int
     ) -> dict[str, pd.DataFrame]:
-        """Filter tables to only include data before cutoff_time."""
+        """Filter tables to only include data before cutoff_time.
+
+        If max_matches_per_team is set, keeps only the most recent N
+        matches per team to cap graph size.
+        """
         hist_matches = self.matches[self.matches["kickoff_time"] < cutoff_time]
+
+        # Cap matches per team to limit graph size
+        cap = self.snapshot_config.max_matches_per_team
+        if cap > 0 and len(hist_matches) > cap * 2:
+            # Collect the last N match IDs for each team (home + away)
+            keep_ids: set = set()
+            for col in ("home_team_id", "away_team_id"):
+                per_team = (
+                    hist_matches.sort_values("kickoff_time", ascending=False)
+                    .groupby(col)["id"]
+                    .head(cap)
+                )
+                keep_ids.update(per_team.values)
+            hist_matches = hist_matches[hist_matches["id"].isin(keep_ids)]
+
         hist_match_ids = set(hist_matches["id"].values)
 
         tables: dict[str, pd.DataFrame] = {
@@ -124,10 +161,15 @@ class SnapshotBuilder:
         if "matches" in tables and not tables["matches"].empty:
             custom_features["matches"] = encode_match_features(tables["matches"])
 
-        if "match_stats" in tables and not tables["match_stats"].empty:
-            custom_features["match_stats"] = encode_match_stat_features(
-                tables["match_stats"]
-            )
+        if "match_stats" in tables:
+            if not tables["match_stats"].empty:
+                custom_features["match_stats"] = encode_match_stat_features(
+                    tables["match_stats"]
+                )
+            else:
+                # Empty table — use consistent 11-dim zeros so feature dims
+                # don't change between snapshots
+                custom_features["match_stats"] = torch.zeros((0, 11), dtype=torch.float32)
 
         if (
             self.hetero_config.include_events
@@ -149,14 +191,31 @@ class SnapshotBuilder:
                 (len(tables["competitions"]), 1), dtype=torch.float32
             )
 
-        data, metadata, id_maps = to_hetero_graph(
+        data, _, id_maps = to_hetero_graph(
             tables,
             self.relationships,
             add_reverse_edges=True,
             custom_features=custom_features,
         )
 
-        return data, metadata, id_maps
+        # Use canonical metadata so all snapshots have consistent types
+        canonical_node_types, canonical_edge_types = self._canonical_metadata
+
+        # Ensure all node types exist (even if empty)
+        for nt in canonical_node_types:
+            if nt not in data.node_types:
+                # Use consistent feature dim from custom_features or 1
+                feat_dim = custom_features[nt].shape[1] if nt in custom_features else 1
+                data[nt].x = torch.zeros((0, feat_dim), dtype=torch.float32)
+                data[nt].num_nodes = 0
+                data[nt].node_id = torch.zeros(0, dtype=torch.long)
+
+        # Ensure all edge types exist (empty if no edges)
+        for et in canonical_edge_types:
+            if et not in data.edge_types:
+                data[et].edge_index = torch.zeros((2, 0), dtype=torch.long)
+
+        return data, self._canonical_metadata, id_maps
 
     def build_training_samples(self) -> list[TrainingSample]:
         """Pre-compute all training samples grouped by matchday.
@@ -168,10 +227,10 @@ class SnapshotBuilder:
         """
         samples: list[TrainingSample] = []
 
-        # Group by kickoff date (day-level) to share snapshots
+        # Group by week to share snapshots (fewer, larger batches)
         self.matches["_date"] = (
-            self.matches["kickoff_time"] // 86400
-        )  # day-level bucket
+            self.matches["kickoff_time"] // (86400 * 7)
+        )  # week-level bucket
 
         snapshot_cache: dict[int, tuple[HeteroData, tuple, dict]] = {}
 
@@ -215,6 +274,7 @@ class SnapshotBuilder:
                     home_score=int(match["home_score"]),
                     away_score=int(match["away_score"]),
                     match_id=int(match["id"]),
+                    date_key=int(date_key),
                 )
             )
 

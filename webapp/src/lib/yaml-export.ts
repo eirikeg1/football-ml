@@ -1,5 +1,6 @@
 import yaml from "js-yaml";
 import type { NodeInstance, Connection } from "./types";
+import type { TrainingConfig } from "./training-types";
 import { getNodeDef } from "./registry";
 
 interface YamlNode {
@@ -71,6 +72,22 @@ export function exportYaml(
   };
 
   return yaml.dump(graph, {
+    indent: 2,
+    lineWidth: -1,
+    noRefs: true,
+    sortKeys: false,
+  });
+}
+
+export function exportFullYaml(
+  nodes: NodeInstance[],
+  connections: Connection[],
+  trainingConfig: TrainingConfig
+): string {
+  const pipelineYaml = exportYaml(nodes, connections);
+  const pipeline = yaml.load(pipelineYaml) as Record<string, unknown>;
+  const full = { ...pipeline, training: trainingConfig };
+  return yaml.dump(full, {
     indent: 2,
     lineWidth: -1,
     noRefs: true,

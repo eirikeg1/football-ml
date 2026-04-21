@@ -3,14 +3,21 @@
   import Sidebar from "./components/Sidebar.svelte";
   import Canvas from "./components/Canvas.svelte";
   import DetailPanel from "./components/DetailPanel.svelte";
+  import TrainingView from "./components/TrainingView.svelte";
+
+  let activeView = $state<"design" | "training">("design");
 </script>
 
 <div class="app">
-  <Toolbar />
+  <Toolbar {activeView} onViewChange={(v) => (activeView = v)} />
   <div class="main">
-    <Sidebar />
-    <Canvas />
-    <DetailPanel />
+    {#if activeView === "design"}
+      <Sidebar />
+      <Canvas />
+      <DetailPanel />
+    {:else}
+      <TrainingView />
+    {/if}
   </div>
 </div>
 

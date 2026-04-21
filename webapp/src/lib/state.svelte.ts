@@ -11,6 +11,10 @@ function generateConnectionId(): string {
   return `conn_${nextId++}`;
 }
 
+export type OpenPopover =
+  | { kind: "node-info"; nodeId: string }
+  | { kind: "connection-issues"; connId: string };
+
 // Reactive state using Svelte 5 runes
 export const graphState = $state({
   nodes: [] as NodeInstance[],
@@ -18,7 +22,27 @@ export const graphState = $state({
   selectedNodeIds: new Set<string>(),
   selectedConnectionId: null as string | null,
   pendingConnection: null as PendingConnection | null,
+  openPopover: null as OpenPopover | null,
 });
+
+function samePopover(a: OpenPopover, b: OpenPopover): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "node-info" && b.kind === "node-info") return a.nodeId === b.nodeId;
+  if (a.kind === "connection-issues" && b.kind === "connection-issues") return a.connId === b.connId;
+  return false;
+}
+
+export function togglePopover(p: OpenPopover): void {
+  if (graphState.openPopover && samePopover(graphState.openPopover, p)) {
+    graphState.openPopover = null;
+  } else {
+    graphState.openPopover = p;
+  }
+}
+
+export function closePopover(): void {
+  graphState.openPopover = null;
+}
 
 export function addNode(
   defId: string,
@@ -104,36 +128,20 @@ export function addConnection(
   );
   if (exists) return null;
 
-  // Validate port data type compatibility
-  const fromNodeInstance = graphState.nodes.find(
-    (n) => n.instanceId === fromNode
-  );
+  // Incompatible connections (dtype, shape, dim, etc.) are still created — they
+  // surface as red edges with a clickable error badge via the validation layer.
+  // This is intentional: hiding the failed drop was worse UX than showing the bug.
   const toNodeInstance = graphState.nodes.find(
     (n) => n.instanceId === toNode
   );
-  if (fromNodeInstance && toNodeInstance) {
-    const fromDef = getNodeDef(fromNodeInstance.defId);
-    const toDef = getNodeDef(toNodeInstance.defId);
-    const fromPortDef = fromDef?.ports.find(
-      (p) => p.name === fromPort && p.type === "output"
-    );
-    const toPortDef = toDef?.ports.find(
-      (p) => p.name === toPort && p.type === "input"
-    );
-    // Reject incompatible data types
-    if (fromPortDef && toPortDef && fromPortDef.dataType !== toPortDef.dataType) {
-      return null;
-    }
-  }
 
-  // Check if the target port already has a connection (unless multi)
+  // Single-input ports replace any existing connection. Multi inputs allow unlimited.
   if (toNodeInstance) {
     const toDef = getNodeDef(toNodeInstance.defId);
     const portDef = toDef?.ports.find(
       (p) => p.name === toPort && p.type === "input"
     );
     if (portDef && !portDef.multi) {
-      // Remove existing connection to this port
       graphState.connections = graphState.connections.filter(
         (c) => !(c.toNode === toNode && c.toPort === toPort)
       );
@@ -165,6 +173,7 @@ export function clearGraph(): void {
   graphState.selectedNodeIds = new Set();
   graphState.selectedConnectionId = null;
   graphState.pendingConnection = null;
+  graphState.openPopover = null;
   nextId = 1;
 }
 

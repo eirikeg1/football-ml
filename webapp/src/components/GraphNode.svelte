@@ -9,7 +9,9 @@
     removeSelectedNodes,
     startConnection,
     finishConnection,
+    togglePopover,
   } from "../lib/state.svelte";
+  import { validateNode } from "../lib/validation";
   import { CATEGORY_COLORS, type NodeInstance, type PortDef } from "../lib/types";
 
   const PORT_COLORS: Record<string, string> = {
@@ -35,6 +37,7 @@
   let isSelected = $derived(graphState.selectedNodeIds.has(node.instanceId));
   let categoryColor = $derived(CATEGORY_COLORS[def.category]);
   let isImplemented = $derived(def.implemented !== false);
+  let nodeReport = $derived(validateNode(node.instanceId, graphState));
 
   let inputPorts = $derived(def.ports.filter((p) => p.type === "input"));
   let outputPorts = $derived(def.ports.filter((p) => p.type === "output"));
@@ -62,12 +65,16 @@
   let nodeStartX = 0;
   let nodeStartY = 0;
   let dragGroupStart: { id: string; x: number; y: number }[] = [];
-  let showInfo = $state(false);
+
+  let infoOpen = $derived(
+    graphState.openPopover?.kind === "node-info" &&
+      graphState.openPopover.nodeId === node.instanceId
+  );
 
   function toggleInfo(e: MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
-    showInfo = !showInfo;
+    togglePopover({ kind: "node-info", nodeId: node.instanceId });
   }
 
   function handleMouseDown(e: MouseEvent) {
@@ -222,11 +229,23 @@
         {#if !isImplemented}
           <span class="not-impl-badge">Soon</span>
         {/if}
+        {#if nodeReport.worstSeverity !== "ok"}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <span
+            class="issue-dot"
+            class:error={nodeReport.worstSeverity === "error"}
+            class:warning={nodeReport.worstSeverity === "warning"}
+            onmousedown={(e) => e.stopPropagation()}
+            onclick={(e) => { e.stopPropagation(); selectNode(node.instanceId); }}
+            title={nodeReport.worstSeverity === "error" ? "Connection errors — see detail panel" : "Connection warnings — see detail panel"}
+          >!</span>
+        {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <span
           class="info-btn"
-          class:active={showInfo}
+          class:active={infoOpen}
           onmousedown={(e) => e.stopPropagation()}
           onclick={toggleInfo}
           title="Show module info"
@@ -340,28 +359,6 @@
     />
   {/each}
 
-  <!-- Info popover as separate foreignObject so it isn't clipped -->
-  {#if showInfo}
-    <foreignObject
-      x={NODE_WIDTH + OVERFLOW_PAD + 10}
-      y={0}
-      width="280"
-      height="400"
-      style="overflow: visible; pointer-events: none;"
-    >
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div class="info-popover" onmousedown={(e) => e.stopPropagation()} style="pointer-events: auto;">
-        {#each def.description.split('\n') as line}
-          {#if line.trim() === ''}
-            <div class="info-gap"></div>
-          {:else}
-            <p class="info-line">{line}</p>
-          {/if}
-        {/each}
-      </div>
-    </foreignObject>
-  {/if}
 </g>
 
 <style>
@@ -463,26 +460,36 @@
     background: rgba(74, 158, 255, 0.1);
   }
 
-  .info-popover {
-    width: 270px;
-    background: #16213e;
-    border: 1px solid #4a6fa5;
-    border-radius: 8px;
-    padding: 12px 14px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    cursor: default;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  .issue-dot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: "Georgia", "Times New Roman", serif;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
   }
 
-  .info-line {
-    font-size: 11.5px;
-    line-height: 1.55;
-    color: #8892a4;
-    margin: 0 0 2px 0;
+  .issue-dot.error {
+    color: #fff;
+    background: var(--error);
+    border-color: var(--error);
   }
 
-  .info-gap {
-    height: 8px;
+  .issue-dot.warning {
+    color: #fff;
+    background: var(--warning);
+    border-color: var(--warning);
+  }
+
+  .issue-dot:hover {
+    filter: brightness(1.15);
   }
 
   .node-body {

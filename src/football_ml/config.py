@@ -69,6 +69,7 @@ class SnapshotConfig:
     strategy: str = "per_matchday"
     min_history_matches: int = 10
     seq_len: int = 10
+    max_matches_per_team: int = 30
 
 
 @dataclass

@@ -28,6 +28,7 @@ class HeteroPipeline(nn.Module):
         num_teams: int,
         num_competitions: int,
         head: str = "match_outcome",
+        feature_dims: dict[str, int] | None = None,
     ) -> None:
         super().__init__()
 
@@ -37,6 +38,7 @@ class HeteroPipeline(nn.Module):
             metadata,
             num_teams,
             num_competitions,
+            feature_dims=feature_dims,
         )
 
         # Layer 4: Temporal

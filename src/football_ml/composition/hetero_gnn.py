@@ -31,6 +31,7 @@ class HeteroGNN(CompositionModule):
         metadata: tuple[list[str], list[tuple[str, str, str]]],
         num_teams: int,
         num_competitions: int,
+        feature_dims: dict[str, int] | None = None,
     ) -> None:
         super().__init__()
         self.output_dim = config.readout_dim
@@ -41,9 +42,13 @@ class HeteroGNN(CompositionModule):
         self.team_embedding = nn.Embedding(num_teams, config.d_model)
         self.competition_embedding = nn.Embedding(num_competitions, config.d_model)
 
-        # Per-node-type input projections (lazily initialized on first forward)
-        self._projections_initialized = False
+        # Per-node-type input projections
         self.input_projections = nn.ModuleDict()
+        if feature_dims:
+            for node_type, in_dim in feature_dims.items():
+                if node_type not in ("teams", "competitions"):
+                    self.input_projections[node_type] = nn.Linear(in_dim, config.d_model)
+        self._projections_initialized = feature_dims is not None
 
         # HGT convolution layers
         self.convs = nn.ModuleList()
@@ -60,13 +65,13 @@ class HeteroGNN(CompositionModule):
         self.dropout = nn.Dropout(config.dropout)
 
     def _ensure_projections(self, data: HeteroData) -> None:
-        """Lazily initialize input projections based on actual feature dims."""
+        """Lazily initialize input projections if not set at init."""
         if self._projections_initialized:
             return
 
         for node_type in self._node_types:
             if node_type in ("teams", "competitions"):
-                continue  # use learned embeddings
+                continue
             if node_type in data.node_types and hasattr(data[node_type], "x"):
                 in_dim = data[node_type].x.shape[1]
                 self.input_projections[node_type] = nn.Linear(

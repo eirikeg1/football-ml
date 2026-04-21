@@ -7,8 +7,10 @@
     selectNode,
     selectNodes,
     selectConnection,
+    closePopover,
   } from "../lib/state.svelte";
   import { getNodeDef } from "../lib/registry";
+  import { validateConnection } from "../lib/validation";
   import GraphNode from "./GraphNode.svelte";
   import Connection from "./Connection.svelte";
 
@@ -110,6 +112,7 @@
         if (!e.shiftKey) {
           selectNode(null);
           selectConnection(null);
+          closePopover();
         }
       }
     }
@@ -329,6 +332,78 @@
           rx={3 / zoom}
         />
       {/if}
+
+      <!-- Popover overlay: rendered last so it always paints on top of nodes/edges -->
+      {#if graphState.openPopover}
+        {@const pop = graphState.openPopover}
+        {#if pop.kind === "node-info"}
+          {@const node = graphState.nodes.find((n) => n.instanceId === pop.nodeId)}
+          {@const def = node ? getNodeDef(node.defId) : null}
+          {#if node && def}
+            <foreignObject
+              x={node.x + NODE_WIDTH + 10}
+              y={node.y}
+              width="290"
+              height="420"
+              style="overflow: visible; pointer-events: none;"
+            >
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <div
+                class="popover info-popover"
+                onmousedown={(e) => e.stopPropagation()}
+                onclick={(e) => e.stopPropagation()}
+                style="pointer-events: auto;"
+              >
+                {#each def.description.split('\n') as line}
+                  {#if line.trim() === ''}
+                    <div class="info-gap"></div>
+                  {:else}
+                    <p class="info-line">{line}</p>
+                  {/if}
+                {/each}
+                <button class="popover-close" onclick={closePopover}>close</button>
+              </div>
+            </foreignObject>
+          {/if}
+        {:else if pop.kind === "connection-issues"}
+          {@const conn = graphState.connections.find((c) => c.id === pop.connId)}
+          {#if conn}
+            {@const from = getPortPos(conn.fromNode, conn.fromPort, "output")}
+            {@const to = getPortPos(conn.toNode, conn.toPort, "input")}
+            {@const offset = Math.max(50, Math.abs(to.x - from.x) * 0.4)}
+            {@const midX = 0.125 * from.x + 0.375 * (from.x + offset) + 0.375 * (to.x - offset) + 0.125 * to.x}
+            {@const midY = 0.125 * from.y + 0.375 * from.y + 0.375 * to.y + 0.125 * to.y}
+            {@const issues = validateConnection(conn, graphState)}
+            <foreignObject
+              x={midX + 12}
+              y={midY - 12}
+              width="310"
+              height="320"
+              style="overflow: visible; pointer-events: none;"
+            >
+              <!-- svelte-ignore a11y_no_static_element_interactions -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <div
+                class="popover issue-popover"
+                onmousedown={(e) => e.stopPropagation()}
+                onclick={(e) => e.stopPropagation()}
+                style="pointer-events: auto;"
+              >
+                {#each issues as issue}
+                  <div class="issue-row" class:error={issue.severity === "error"} class:warning={issue.severity === "warning"}>
+                    <div class="issue-title">{issue.message}</div>
+                    {#if issue.detail}
+                      <div class="issue-detail">{issue.detail}</div>
+                    {/if}
+                  </div>
+                {/each}
+                <button class="popover-close" onclick={closePopover}>close</button>
+              </div>
+            </foreignObject>
+          {/if}
+        {/if}
+      {/if}
     </g>
   </svg>
 </div>
@@ -352,5 +427,82 @@
     width: 100%;
     height: 100%;
     display: block;
+  }
+
+  .popover {
+    background: #16213e;
+    border: 1px solid #4a6fa5;
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    cursor: default;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .info-popover {
+    width: 280px;
+  }
+
+  .info-line {
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: #8892a4;
+    margin: 0;
+  }
+
+  .info-gap {
+    height: 4px;
+  }
+
+  .issue-popover {
+    width: 300px;
+  }
+
+  .issue-row {
+    padding: 6px 8px;
+    border-left: 3px solid var(--border-color);
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .issue-row.error {
+    border-left-color: var(--error);
+    background: rgba(229, 72, 77, 0.08);
+  }
+
+  .issue-row.warning {
+    border-left-color: var(--warning);
+    background: rgba(245, 166, 35, 0.08);
+  }
+
+  .issue-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+  }
+
+  .issue-detail {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .popover-close {
+    align-self: flex-end;
+    font-size: 10px;
+    padding: 2px 10px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .popover-close:hover {
+    color: var(--text-primary);
+    border-color: var(--border-active);
   }
 </style>

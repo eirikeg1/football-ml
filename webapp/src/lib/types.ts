@@ -7,11 +7,27 @@ export type Category =
   | "temporal"
   | "heads";
 
+export type PortShape = "flat" | "sequence" | "graph" | "dataset";
+
 export interface PortDef {
   name: string;
   type: "input" | "output";
   dataType: "data" | "embedding" | "tensor" | "graph" | "dataset";
   multi?: boolean; // accepts multiple connections
+  // Structural rank of the data flowing through this port. Defaults are inferred
+  // from dataType when omitted (dataset→dataset, graph→graph, otherwise flat).
+  shape?: PortShape;
+  // Name of the node param holding this port's feature-dim width. Used by
+  // validation to compare upstream output width to downstream expected width.
+  // Leave unset when width isn't meaningful (dataset / graph ports).
+  widthParam?: string;
+  // Inputs default to required. Set false for genuinely optional inputs.
+  required?: boolean;
+  // Only meaningful on multi inputs. Defaults to "concat" when multi is true.
+  multiSemantics?: "concat" | "stack";
+  // Soft-warning hint: expected upstream node categories. Emits category_hint
+  // warning when an incoming edge's source category isn't in this list.
+  expectedUpstreamCategories?: Category[];
 }
 
 export interface ParamDef {
@@ -62,6 +78,27 @@ export interface PendingConnection {
   fromY: number;
   mouseX: number;
   mouseY: number;
+}
+
+export type ValidationSeverity = "error" | "warning";
+
+export type ValidationCode =
+  | "dtype_mismatch"
+  | "shape_mismatch"
+  | "dim_mismatch"
+  | "multi_stack_mismatch"
+  | "multi_sum_mismatch"
+  | "cycle"
+  | "required_input_missing"
+  | "upstream_unset"
+  | "category_hint"
+  | "not_implemented";
+
+export interface ValidationIssue {
+  severity: ValidationSeverity;
+  code: ValidationCode;
+  message: string;
+  detail?: string;
 }
 
 export const CATEGORY_COLORS: Record<Category, string> = {

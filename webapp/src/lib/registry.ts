@@ -8,7 +8,9 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Connect to a SQLite database. Select tables and columns in the detail panel. Auto-detects foreign key relationships.\n\nOutput: Multi-table dataset bundle.",
-    ports: [{ name: "dataset", type: "output", dataType: "dataset" }],
+    ports: [
+      { name: "dataset", type: "output", dataType: "dataset", shape: "dataset" },
+    ],
     params: [{ name: "db_path", type: "string", default: "" }],
     detailPanel: "datasource_sqlite",
   },
@@ -18,7 +20,9 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Load CSV files from a directory. Each file becomes a table. Configure columns and relationships in the detail panel.\n\nOutput: Multi-table dataset bundle (one table per file).",
-    ports: [{ name: "dataset", type: "output", dataType: "dataset" }],
+    ports: [
+      { name: "dataset", type: "output", dataType: "dataset", shape: "dataset" },
+    ],
     params: [{ name: "directory", type: "string", default: "" }],
     detailPanel: "datasource_csv",
   },
@@ -29,8 +33,8 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Select a single table from a multi-table dataset. Configure column filtering in the detail panel.\n\nInput: Multi-table dataset.\nOutput: Single table data.",
     ports: [
-      { name: "dataset", type: "input", dataType: "dataset" },
-      { name: "table_data", type: "output", dataType: "data" },
+      { name: "dataset", type: "input", dataType: "dataset", shape: "dataset" },
+      { name: "table_data", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [{ name: "table", type: "string", default: "" }],
     detailPanel: "table_selector",
@@ -42,9 +46,9 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Convert a multi-table dataset into a single representation.\n\n- flatten: join all tables into one wide table\n- aligned: keep tables separate but aligned by key\n- graph: create a heterogeneous graph (PyTorch Geometric)\n\nInput: Multi-table dataset.\nOutput: Flat data or graph depending on strategy.",
     ports: [
-      { name: "dataset", type: "input", dataType: "dataset" },
-      { name: "output", type: "output", dataType: "data" },
-      { name: "graph_output", type: "output", dataType: "graph" },
+      { name: "dataset", type: "input", dataType: "dataset", shape: "dataset" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
+      { name: "graph_output", type: "output", dataType: "graph", shape: "graph" },
     ],
     params: [
       {
@@ -64,7 +68,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Per-match player statistics from SofaScore (ratings, goals, assists, passes, duels, etc.). Use as input for player-level feature extractors or augmentation.\n\nOutput: Tabular data with one row per player per match, columns for each stat.",
-    ports: [{ name: "player_data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "player_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [
       {
         name: "format",
@@ -82,7 +94,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Team-level match statistics from SofaScore (possession, shots, corners, fouls, xG, etc.). Use as input for team performance encoders.\n\nOutput: Tabular data with one row per team per match.",
-    ports: [{ name: "match_data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "match_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [
       {
         name: "format",
@@ -100,7 +120,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Per-match player statistics from ESPN. Similar coverage to SofaScore but in ESPN's format. Can be merged with other player data sources.\n\nOutput: Tabular data with one row per player per match.",
-    ports: [{ name: "player_data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "player_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [
       {
         name: "format",
@@ -118,7 +146,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Team-level match statistics from ESPN. Use as input for team performance encoders or merge with other match data sources.\n\nOutput: Tabular data with one row per team per match.",
-    ports: [{ name: "match_data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "match_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [
       {
         name: "format",
@@ -136,7 +172,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Football Manager player attribute vectors (~50 attributes per player). Provides a pre-season snapshot of player quality and type. Note: FM data has an update lag since attributes are set pre-season. Combining with current season form data can compensate for this.\n\nOutput: Tabular data with one row per player, columns for each attribute (pace, passing, finishing, etc.).",
-    ports: [{ name: "player_data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "player_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [
       {
         name: "format",
@@ -154,7 +198,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Player market values, contract data, and transfer history from Transfermarkt. Market value serves as a proxy for player quality and squad depth.\n\nOutput: Tabular data with one row per player (value, age, contract end, position, etc.).",
-    ports: [{ name: "player_data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "player_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [{ name: "features", type: "number", default: 8 }],
     implemented: false,
   },
@@ -164,7 +216,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Continuously updated Elo ratings for football clubs. A strong signal for team strength that can be fed into team-level encoders.\n\nOutput: Tabular data with one row per team per date (Elo rating, rank, rating change).",
-    ports: [{ name: "team_data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "team_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [{ name: "features", type: "number", default: 3 }],
     implemented: false,
   },
@@ -175,8 +235,20 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Advanced statistics from FBref (powered by StatsBomb). Includes progressive passes, pressures, shot-creating actions, xG, and more. Provides both player-level and match-level outputs.\n\nOutput (player_data): One row per player per match with advanced stats.\nOutput (match_data): One row per team per match with aggregate advanced stats.",
     ports: [
-      { name: "player_data", type: "output", dataType: "data" },
-      { name: "match_data", type: "output", dataType: "data" },
+      {
+        name: "player_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+      {
+        name: "match_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
     ],
     params: [{ name: "features", type: "number", default: 40 }],
     implemented: false,
@@ -187,7 +259,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Match schedule and fixture context: dates, competitions, venues, rest days between matches. Use for computing schedule density features (days since/until match, matches per week).\n\nOutput: Tabular data with one row per match (date, competition, home/away, venue, rest days).",
-    ports: [{ name: "schedule_data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "schedule_data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [{ name: "features", type: "number", default: 10 }],
     implemented: false,
   },
@@ -197,7 +277,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     category: "data_sources",
     description:
       "Load a custom dataset from a file path. Supports CSV, Parquet, and JSON formats. Use for any data source not covered by the built-in nodes.\n\nOutput: Tabular data loaded from the specified file.",
-    ports: [{ name: "data", type: "output", dataType: "data" }],
+    ports: [
+      {
+        name: "data",
+        type: "output",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "features",
+      },
+    ],
     params: [
       { name: "path", type: "string", default: "" },
       {
@@ -219,8 +307,8 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Scale and normalize feature values. Place between data sources and feature extractors to ensure consistent value ranges.\n\n- standard: zero mean, unit variance (z-score)\n- minmax: scale to [0, 1]\n- robust: uses median and IQR, resilient to outliers\n\nInput: Raw tabular data.\nOutput: Normalized tabular data (same shape).",
     ports: [
-      { name: "input", type: "input", dataType: "data" },
-      { name: "output", type: "output", dataType: "data" },
+      { name: "input", type: "input", dataType: "data", shape: "flat" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [
       {
@@ -238,8 +326,8 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Select a subset of input features to reduce dimensionality and remove noise.\n\n- all: pass through (no selection)\n- variance_threshold: drop low-variance features\n- mutual_info: rank by mutual information with target\n- manual: specify features explicitly\n\nInput: Tabular data.\nOutput: Tabular data with selected columns only.",
     ports: [
-      { name: "input", type: "input", dataType: "data" },
-      { name: "output", type: "output", dataType: "data" },
+      { name: "input", type: "input", dataType: "data", shape: "flat" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [
       {
@@ -258,8 +346,8 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Fill in missing values in the dataset. Important when merging sources with different coverage.\n\n- mean/median: replace with column mean or median\n- zero: fill with zeros\n- forward_fill: propagate last known value forward (useful for time series)\n\nInput: Tabular data with missing values.\nOutput: Tabular data with no missing values (same shape).",
     ports: [
-      { name: "input", type: "input", dataType: "data" },
-      { name: "output", type: "output", dataType: "data" },
+      { name: "input", type: "input", dataType: "data", shape: "flat" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [
       {
@@ -277,8 +365,8 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Create a sliding window over time-ordered data to capture recent history. Useful for building form features from per-match stats.\n\n- concat: stack the last N matches as one wide feature vector\n- mean: average over the window\n- ewma: exponentially weighted moving average (recent matches weighted more)\n\nInput: Time-ordered tabular data.\nOutput: Windowed features (one row per match, incorporating history).",
     ports: [
-      { name: "input", type: "input", dataType: "data" },
-      { name: "output", type: "output", dataType: "data" },
+      { name: "input", type: "input", dataType: "data", shape: "flat" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [
       { name: "window_size", type: "number", default: 5 },
@@ -297,8 +385,8 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Add noise to training data for regularization and robustness. Only applied during training.\n\n- gaussian: add Gaussian noise scaled by the scale parameter\n- dropout: randomly zero out features\n- mixup: blend pairs of samples\n\nInput: Tabular data.\nOutput: Augmented tabular data (same shape, with noise added).",
     ports: [
-      { name: "input", type: "input", dataType: "data" },
-      { name: "output", type: "output", dataType: "data" },
+      { name: "input", type: "input", dataType: "data", shape: "flat" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [
       {
@@ -317,9 +405,9 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Combine two data streams into one. Use to merge data from different sources (e.g., SofaScore + ESPN, or player stats + market values).\n\n- concat: concatenate columns side by side\n- left_join: keep all rows from input_a, match from input_b\n- inner_join: keep only rows that match in both inputs\n\nInput: Two tabular data streams.\nOutput: Merged tabular data.",
     ports: [
-      { name: "input_a", type: "input", dataType: "data" },
-      { name: "input_b", type: "input", dataType: "data" },
-      { name: "output", type: "output", dataType: "data" },
+      { name: "input_a", type: "input", dataType: "data", shape: "flat" },
+      { name: "input_b", type: "input", dataType: "data", shape: "flat" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [
       {
@@ -343,8 +431,8 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Compute rolling statistics over a window of recent matches. Creates new features from the trend in each column.\n\n- mean: rolling average\n- mean_std: rolling mean and standard deviation\n- mean_std_minmax: mean, std, min, and max\n- all: mean, std, min, max, median, and trend\n\nInput: Time-ordered tabular data.\nOutput: Tabular data with rolling stat columns appended.",
     ports: [
-      { name: "input", type: "input", dataType: "data" },
-      { name: "output", type: "output", dataType: "data" },
+      { name: "input", type: "input", dataType: "data", shape: "flat" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [
       { name: "window", type: "number", default: 5 },
@@ -363,8 +451,8 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Apply log(x + offset) to compress the range of skewed features. Useful for values like market value, attendance, or goal counts that span orders of magnitude.\n\nInput: Tabular data with positive-valued columns.\nOutput: Log-transformed tabular data (same shape).",
     ports: [
-      { name: "input", type: "input", dataType: "data" },
-      { name: "output", type: "output", dataType: "data" },
+      { name: "input", type: "input", dataType: "data", shape: "flat" },
+      { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [{ name: "offset", type: "number", default: 1 }],
   },
@@ -377,8 +465,20 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Encode player attribute vectors (e.g., from Football Manager) into a dense embedding that captures player quality and type. Uses an MLP with configurable depth.\n\nCan be pretrained via multi-task learning (predict position + market value) to learn richer representations before plugging into the pipeline.\n\nInput: Player attribute vector (batch, input_dim).\nOutput: Player embedding (batch, output_dim).",
     ports: [
-      { name: "attributes", type: "input", dataType: "data" },
-      { name: "embedding", type: "output", dataType: "embedding" },
+      {
+        name: "attributes",
+        type: "input",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "input_dim",
+      },
+      {
+        name: "embedding",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "output_dim",
+      },
     ],
     params: [
       { name: "input_dim", type: "number", default: 50 },
@@ -394,8 +494,20 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Encode a player's recent match statistics into a form embedding using a GRU over the last N matches. Captures current performance trajectory and momentum.\n\nInput: Sequence of per-match stat vectors (batch, seq_len, input_dim).\nOutput: Form embedding (batch, output_dim).",
     ports: [
-      { name: "form_sequence", type: "input", dataType: "data" },
-      { name: "embedding", type: "output", dataType: "embedding" },
+      {
+        name: "form_sequence",
+        type: "input",
+        dataType: "data",
+        shape: "sequence",
+        widthParam: "input_dim",
+      },
+      {
+        name: "embedding",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "output_dim",
+      },
     ],
     params: [
       { name: "input_dim", type: "number", default: 20 },
@@ -411,8 +523,20 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Encode team-level performance statistics (xG, xGA, possession, points, Elo, etc.) into a team performance embedding.\n\nFeed with team stats from match data sources and Club Elo ratings.\n\nInput: Team stat vector (batch, input_dim).\nOutput: Team performance embedding (batch, output_dim).",
     ports: [
-      { name: "stats", type: "input", dataType: "data" },
-      { name: "embedding", type: "output", dataType: "embedding" },
+      {
+        name: "stats",
+        type: "input",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "input_dim",
+      },
+      {
+        name: "embedding",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "output_dim",
+      },
     ],
     params: [
       { name: "input_dim", type: "number", default: 15 },
@@ -427,8 +551,20 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Encode match context features: home/away, competition type, rest days, schedule density, derby flag, etc.\n\nFeed with data from the Match Schedule source. These are per-fixture features that don't change over the match.\n\nInput: Context feature vector (batch, input_dim).\nOutput: Context embedding (batch, output_dim).",
     ports: [
-      { name: "context", type: "input", dataType: "data" },
-      { name: "embedding", type: "output", dataType: "embedding" },
+      {
+        name: "context",
+        type: "input",
+        dataType: "data",
+        shape: "flat",
+        widthParam: "input_dim",
+      },
+      {
+        name: "embedding",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "output_dim",
+      },
     ],
     params: [
       { name: "input_dim", type: "number", default: 10 },
@@ -449,8 +585,17 @@ export const NODE_REGISTRY: NodeDef[] = [
         type: "input",
         dataType: "embedding",
         multi: true,
+        shape: "flat",
+        widthParam: "player_dim",
+        multiSemantics: "stack",
       },
-      { name: "team_embedding", type: "output", dataType: "embedding" },
+      {
+        name: "team_embedding",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "output_dim",
+      },
     ],
     params: [
       { name: "player_dim", type: "number", default: 128 },
@@ -467,8 +612,16 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Heterogeneous Graph Transformer (HGT) over relational data tables. Tables become node types, FK relationships become edges. Learns entity representations through message passing across the full relational graph.\n\nTeams and competitions use learned embeddings. Match stats and events provide numeric features.\n\nProduces match representations by concatenating home + away team embeddings.\n\nInput: Multi-table dataset.\nOutput: Match embedding (2 x d_model dimensions).",
     ports: [
-      { name: "dataset", type: "input", dataType: "dataset" },
-      { name: "match_repr", type: "output", dataType: "embedding" },
+      { name: "dataset", type: "input", dataType: "dataset", shape: "dataset" },
+      // NOTE: description states output is 2×d_model (concat of home+away). For now
+      // widthParam points at d_model; add a widthMultiplier in the future for strictness.
+      {
+        name: "match_repr",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "d_model",
+      },
     ],
     params: [
       { name: "d_model", type: "number", default: 128 },
@@ -491,8 +644,17 @@ export const NODE_REGISTRY: NodeDef[] = [
         type: "input",
         dataType: "embedding",
         multi: true,
+        shape: "flat",
+        widthParam: "d_model",
+        multiSemantics: "stack",
       },
-      { name: "match_repr", type: "output", dataType: "embedding" },
+      {
+        name: "match_repr",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "output_dim",
+      },
     ],
     params: [
       { name: "d_model", type: "number", default: 64 },
@@ -513,8 +675,17 @@ export const NODE_REGISTRY: NodeDef[] = [
         type: "input",
         dataType: "embedding",
         multi: true,
+        shape: "flat",
+        widthParam: "d_model",
+        multiSemantics: "stack",
       },
-      { name: "match_repr", type: "output", dataType: "embedding" },
+      {
+        name: "match_repr",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "output_dim",
+      },
     ],
     params: [
       { name: "d_model", type: "number", default: 64 },
@@ -532,8 +703,20 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "GRU-based temporal model over a sequence of match representations. Captures form trajectory, momentum, and dynamics over time.\n\nProcesses the last N matches (each represented by the fusion output) and produces a temporal state summarizing recent history.\n\nInput: Sequence of match representations (batch, seq_len, input_dim).\nOutput: Temporal state (batch, output_dim).",
     ports: [
-      { name: "sequence", type: "input", dataType: "embedding" },
-      { name: "temporal_state", type: "output", dataType: "embedding" },
+      {
+        name: "sequence",
+        type: "input",
+        dataType: "embedding",
+        shape: "sequence",
+        widthParam: "input_dim",
+      },
+      {
+        name: "temporal_state",
+        type: "output",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "output_dim",
+      },
     ],
     params: [
       { name: "input_dim", type: "number", default: 128 },
@@ -551,8 +734,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Predict match outcome as win/draw/loss probabilities (3-class classification). The most common prediction target for football match prediction.\n\nInput: Temporal state (batch, input_dim).\nOutput: Logits for [win, draw, loss] (batch, 3). Apply softmax for probabilities.",
     ports: [
-      { name: "temporal_state", type: "input", dataType: "embedding" },
-      { name: "prediction", type: "output", dataType: "tensor" },
+      {
+        name: "temporal_state",
+        type: "input",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "input_dim",
+        expectedUpstreamCategories: ["fusion", "temporal", "composition"],
+      },
+      { name: "prediction", type: "output", dataType: "tensor", shape: "flat" },
     ],
     params: [
       { name: "input_dim", type: "number", default: 128 },
@@ -566,8 +756,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Predict goal distributions for home and away teams. Outputs logits over discrete goal counts (0 to max_goals) for each team independently.\n\nInput: Temporal state (batch, input_dim).\nOutput: Goal distribution logits (batch, 2, max_goals+1) where dim 1 is [home, away].",
     ports: [
-      { name: "temporal_state", type: "input", dataType: "embedding" },
-      { name: "prediction", type: "output", dataType: "tensor" },
+      {
+        name: "temporal_state",
+        type: "input",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "input_dim",
+        expectedUpstreamCategories: ["fusion", "temporal", "composition"],
+      },
+      { name: "prediction", type: "output", dataType: "tensor", shape: "flat" },
     ],
     params: [
       { name: "input_dim", type: "number", default: 128 },
@@ -581,8 +778,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Predict per-player statistics for an upcoming match (goals, assists, shots, key passes, etc.).\n\nInput: Temporal state (batch, input_dim).\nOutput: Predicted stats per player (batch, num_stats).",
     ports: [
-      { name: "temporal_state", type: "input", dataType: "embedding" },
-      { name: "prediction", type: "output", dataType: "tensor" },
+      {
+        name: "temporal_state",
+        type: "input",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "input_dim",
+        expectedUpstreamCategories: ["fusion", "temporal", "composition"],
+      },
+      { name: "prediction", type: "output", dataType: "tensor", shape: "flat" },
     ],
     params: [
       { name: "input_dim", type: "number", default: 128 },
@@ -596,8 +800,15 @@ export const NODE_REGISTRY: NodeDef[] = [
     description:
       "Predict team-level match statistics (possession %, total shots, xG, corners, fouls, etc.).\n\nInput: Temporal state (batch, input_dim).\nOutput: Predicted team stats (batch, num_stats).",
     ports: [
-      { name: "temporal_state", type: "input", dataType: "embedding" },
-      { name: "prediction", type: "output", dataType: "tensor" },
+      {
+        name: "temporal_state",
+        type: "input",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "input_dim",
+        expectedUpstreamCategories: ["fusion", "temporal", "composition"],
+      },
+      { name: "prediction", type: "output", dataType: "tensor", shape: "flat" },
     ],
     params: [
       { name: "input_dim", type: "number", default: 128 },
