@@ -38,16 +38,29 @@ export interface PortRequirementStatus {
   issues: ValidationIssue[]; // port-level issues (e.g., required_input_missing, aggregated)
 }
 
+export interface OutputConsumer {
+  connId: string;
+  toNodeId: string;
+  toNodeLabel: string;
+  toPort: string;
+  expectedShape?: PortShape;
+  expectedWidth?: number;
+  issues: ValidationIssue[];
+}
+
+export interface OutputPortStatus {
+  portName: string;
+  dataType: string;
+  shape: PortShape;
+  widthParam?: string;
+  width?: number;
+  consumers: OutputConsumer[];
+  status: "ok" | "warning" | "error";
+}
+
 export interface NodeValidationReport {
   inputs: PortRequirementStatus[];
-  outputs: {
-    portName: string;
-    dataType: string;
-    shape: PortShape;
-    widthParam?: string;
-    width?: number;
-    consumers: { connId: string; toNodeId: string; toNodeLabel: string; toPort: string }[];
-  }[];
+  outputs: OutputPortStatus[];
   worstSeverity: "ok" | "warning" | "error";
 }
 
@@ -390,22 +403,36 @@ export function validateNode(
     });
   }
 
-  const outputs: NodeValidationReport["outputs"] = [];
+  const outputs: OutputPortStatus[] = [];
   for (const port of def.ports) {
     if (port.type !== "output") continue;
     const outgoing = state.connections.filter(
       (c) => c.fromNode === instanceId && c.fromPort === port.name
     );
-    const consumers = outgoing.map((c) => ({
-      connId: c.id,
-      toNodeId: c.toNode,
-      toNodeLabel: nodeLabel(nodeById(state, c.toNode)),
-      toPort: c.toPort,
-    }));
-    // Outgoing edge severities also contribute to node-level worst severity.
-    for (const c of outgoing) {
-      for (const i of validateConnection(c, state)) bumpWorst(i.severity);
-    }
+    const consumers: OutputConsumer[] = outgoing.map((c) => {
+      const to = nodeById(state, c.toNode);
+      const toPortDef = to ? portOf(to, c.toPort, "input") : undefined;
+      const expectedShape = toPortDef ? effectiveShape(toPortDef) : undefined;
+      const expectedWidth = to && toPortDef ? resolveWidth(toPortDef, to) : undefined;
+      const issues = validateConnection(c, state);
+      for (const i of issues) bumpWorst(i.severity);
+      return {
+        connId: c.id,
+        toNodeId: c.toNode,
+        toNodeLabel: nodeLabel(to),
+        toPort: c.toPort,
+        expectedShape,
+        expectedWidth,
+        issues,
+      };
+    });
+    const anyError = consumers.some((c) => c.issues.some((i) => i.severity === "error"));
+    const anyWarning = consumers.some((c) => c.issues.some((i) => i.severity === "warning"));
+    const status: OutputPortStatus["status"] = anyError
+      ? "error"
+      : anyWarning
+        ? "warning"
+        : "ok";
     outputs.push({
       portName: port.name,
       dataType: port.dataType,
@@ -413,6 +440,7 @@ export function validateNode(
       widthParam: port.widthParam,
       width: resolveWidth(port, node),
       consumers,
+      status,
     });
   }
 

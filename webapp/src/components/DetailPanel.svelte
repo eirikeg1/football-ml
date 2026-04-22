@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { graphState, getSelectedNode } from "../lib/state.svelte";
+  import { graphState, getSelectedNode, updateNodeParam } from "../lib/state.svelte";
   import { getNodeDef } from "../lib/registry";
   import { validateNode } from "../lib/validation";
   import { CATEGORY_COLORS, CATEGORY_LABELS } from "../lib/types";
@@ -29,6 +29,20 @@
     if (status === "warning") return "⚠";
     if (status === "error") return "✗";
     return "○";
+  }
+
+  function handleParamChange(
+    instanceId: string,
+    paramName: string,
+    value: string,
+    type: string
+  ) {
+    if (type === "number") {
+      const n = parseFloat(value);
+      if (!isNaN(n)) updateNodeParam(instanceId, paramName, n);
+    } else {
+      updateNodeParam(instanceId, paramName, value);
+    }
   }
 </script>
 
@@ -139,9 +153,9 @@
             {/each}
 
             {#each report.outputs as output}
-              <div class="req-row out">
+              <div class="req-row out" class:error={output.status === "error"} class:warning={output.status === "warning"}>
                 <div class="req-head">
-                  <span class="req-status out-dot">→</span>
+                  <span class="req-status out-dot">{output.status === "error" ? statusSymbol("error") : output.status === "warning" ? statusSymbol("warning") : "→"}</span>
                   <span class="req-name">OUT · {output.portName}</span>
                   <span class="req-chip" title="data type">{output.dataType}</span>
                   <span class="req-chip subtle" title="shape">{output.shape}</span>
@@ -152,25 +166,74 @@
                     , width <span class="mono">{output.widthParam}{output.width !== undefined ? ` = ${output.width}` : " (unset)"}</span>
                   {/if}
                 </div>
-                {#if output.consumers.length > 0}
-                  <div class="req-consumers">
-                    feeds: {output.consumers.map((c) => `${c.toNodeLabel}.${c.toPort}`).join(", ")}
+                {#each output.consumers as consumer}
+                  <div class="req-connection">
+                    → <strong>{consumer.toNodeLabel}</strong>.{consumer.toPort}
+                    {#if consumer.expectedWidth !== undefined}
+                      <span class="mono dim">w={consumer.expectedWidth}</span>
+                    {/if}
+                    {#if consumer.expectedShape}
+                      <span class="mono dim">{consumer.expectedShape}</span>
+                    {/if}
+                    {#if consumer.issues.length > 0}
+                      <ul class="req-issues">
+                        {#each consumer.issues as issue}
+                          <li class:err={issue.severity === "error"} class:warn={issue.severity === "warning"}>
+                            {issue.message}
+                            {#if issue.detail}
+                              <div class="req-issue-detail">{issue.detail}</div>
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
                   </div>
-                {/if}
+                {/each}
               </div>
             {/each}
           </div>
         {/if}
 
-        <!-- Inline params summary -->
+        <!-- Parameters (editable) -->
         {#if def.params.length > 0}
           <div class="section">
             <div class="section-title">Parameters</div>
             <div class="params-list">
               {#each def.params as param}
                 <div class="param-item">
-                  <span class="param-name">{param.name}</span>
-                  <span class="param-value">{selectedNode.params[param.name]}</span>
+                  <label class="param-name" for={`detail-param-${selectedNode.instanceId}-${param.name}`}>{param.name}</label>
+                  {#if param.type === "select" && param.options}
+                    <select
+                      id={`detail-param-${selectedNode.instanceId}-${param.name}`}
+                      class="param-input"
+                      value={selectedNode.params[param.name]}
+                      onchange={(e) =>
+                        handleParamChange(
+                          selectedNode.instanceId,
+                          param.name,
+                          (e.target as HTMLSelectElement).value,
+                          "string"
+                        )}
+                    >
+                      {#each param.options as opt}
+                        <option value={opt}>{opt}</option>
+                      {/each}
+                    </select>
+                  {:else}
+                    <input
+                      id={`detail-param-${selectedNode.instanceId}-${param.name}`}
+                      class="param-input"
+                      type={param.type === "number" ? "number" : "text"}
+                      value={selectedNode.params[param.name]}
+                      onchange={(e) =>
+                        handleParamChange(
+                          selectedNode.instanceId,
+                          param.name,
+                          (e.target as HTMLInputElement).value,
+                          param.type
+                        )}
+                    />
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -330,10 +393,13 @@
     color: var(--text-secondary);
   }
 
-  .param-value {
-    color: var(--text-primary);
-    font-family: "JetBrains Mono", "Fira Code", monospace;
+  .param-input {
+    width: 120px;
     font-size: 11px;
+  }
+  .param-input[type="number"],
+  .param-input[type="text"] {
+    width: 120px;
   }
 
   /* Connection requirements */
@@ -367,6 +433,18 @@
     background: rgba(255, 255, 255, 0.01);
   }
 
+  .req-row.out.error {
+    border-style: solid;
+    border-color: var(--error);
+    background: rgba(229, 72, 77, 0.06);
+  }
+
+  .req-row.out.warning {
+    border-style: solid;
+    border-color: var(--warning);
+    background: rgba(245, 166, 35, 0.06);
+  }
+
   .req-head {
     display: flex;
     align-items: center;
@@ -398,8 +476,8 @@
     color: #59c97a;
   }
 
-  .out-dot {
-    color: var(--text-muted) !important;
+  .req-row.out:not(.error):not(.warning) .out-dot {
+    color: var(--text-muted);
   }
 
   .req-name {
@@ -439,12 +517,6 @@
     color: var(--text-secondary);
     background: rgba(255, 255, 255, 0.02);
     border-radius: 3px;
-  }
-
-  .req-consumers {
-    font-size: 10.5px;
-    color: var(--text-muted);
-    margin-top: 3px;
   }
 
   .req-issues {
