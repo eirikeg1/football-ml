@@ -43,6 +43,14 @@ export type DetailPanelType =
   | "table_selector"
   | "materialization";
 
+// Freeform guidance rendered in the node info popover, below the description.
+// `placement` is a one-liner about where the node typically sits in a pipeline;
+// `tips` are optional gotchas (parameter constraints, common misuses, etc.).
+export interface NodeHints {
+  placement?: string;
+  tips?: string[];
+}
+
 export interface NodeDef {
   id: string;
   label: string;
@@ -52,6 +60,7 @@ export interface NodeDef {
   params: ParamDef[];
   detailPanel?: DetailPanelType;
   implemented?: boolean; // defaults to true; false shows "Coming soon" indicator
+  hints?: NodeHints;
 }
 
 export interface NodeInstance {

@@ -362,6 +362,19 @@
                     <p class="info-line">{line}</p>
                   {/if}
                 {/each}
+                {#if def.hints?.placement || (def.hints?.tips && def.hints.tips.length > 0)}
+                  <div class="info-gap"></div>
+                  {#if def.hints.placement}
+                    <p class="info-hint"><span class="info-hint-label">Placement</span> {def.hints.placement}</p>
+                  {/if}
+                  {#if def.hints.tips && def.hints.tips.length > 0}
+                    <ul class="info-tips">
+                      {#each def.hints.tips as tip}
+                        <li>{tip}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+                {/if}
                 <button class="popover-close" onclick={closePopover}>close</button>
               </div>
             </foreignObject>
@@ -455,6 +468,35 @@
 
   .info-gap {
     height: 4px;
+  }
+
+  .info-hint {
+    font-size: 11.5px;
+    line-height: 1.55;
+    color: var(--text-primary);
+    margin: 0;
+    padding: 6px 8px;
+    border-left: 3px solid var(--accent);
+    background: rgba(74, 158, 255, 0.06);
+    border-radius: 3px;
+  }
+
+  .info-hint-label {
+    font-weight: 600;
+    color: var(--accent);
+    margin-right: 4px;
+  }
+
+  .info-tips {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #8892a4;
+  }
+
+  .info-tips li {
+    margin-bottom: 2px;
   }
 
   .issue-popover {

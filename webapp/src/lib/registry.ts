@@ -1,4 +1,4 @@
-import type { NodeDef } from "./types";
+import type { NodeDef, PortDef, PortShape } from "./types";
 
 export const NODE_REGISTRY: NodeDef[] = [
   // Data Sources — Generic (implemented)
@@ -13,6 +13,11 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
     params: [{ name: "db_path", type: "string", default: "" }],
     detailPanel: "datasource_sqlite",
+    hints: {
+      placement:
+        "Root of the pipeline. Feed the dataset output into a Table Selector, a Materialize node, or directly into Heterogeneous GNN.",
+      tips: ["Use an absolute path so the detail panel can list available tables."],
+    },
   },
   {
     id: "csv_source",
@@ -25,6 +30,10 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
     params: [{ name: "directory", type: "string", default: "" }],
     detailPanel: "datasource_csv",
+    hints: {
+      placement:
+        "Root of the pipeline. Point at a directory of CSVs — each file becomes a table — then feed Table Selector, Materialize, or Heterogeneous GNN.",
+    },
   },
   {
     id: "table_selector",
@@ -38,6 +47,10 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
     params: [{ name: "table", type: "string", default: "" }],
     detailPanel: "table_selector",
+    hints: {
+      placement:
+        "Sits right after a multi-table data source. The `table_data` output feeds augmentation and feature-extractor nodes that expect flat tabular data.",
+    },
   },
   {
     id: "materialization",
@@ -59,6 +72,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       },
     ],
     detailPanel: "materialization",
+    hints: {
+      placement:
+        "Collapses a multi-table dataset into a single flat table or a homogeneous graph. Use before nodes that don't natively consume the relational dataset.",
+      tips: ["`graph_output` is only populated when strategy = heterogeneous_graph."],
+    },
   },
 
   // Data Sources — Provider-specific (not yet implemented)
@@ -87,6 +105,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "features", type: "number", default: 25 },
     ],
     implemented: false,
+    hints: {
+      placement:
+        "Per-match player data source. Feed into a Player Form Encoder (via a sequence builder like History Sequence or Temporal Window) or into augmentation first.",
+    },
   },
   {
     id: "sofascore_match_stats",
@@ -113,6 +135,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "features", type: "number", default: 30 },
     ],
     implemented: false,
+    hints: {
+      placement:
+        "Team-level match data source. Feed Team Performance Encoder, optionally after normalization or rolling stats.",
+    },
   },
   {
     id: "espn_player_stats",
@@ -139,6 +165,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "features", type: "number", default: 20 },
     ],
     implemented: false,
+    hints: {
+      placement:
+        "Alternative to SofaScore for player-level features. Merge with another source via Data Merge before feeding into a feature extractor.",
+    },
   },
   {
     id: "espn_match_stats",
@@ -165,6 +195,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "features", type: "number", default: 18 },
     ],
     implemented: false,
+    hints: {
+      placement:
+        "Team-level match data source, alternative to SofaScore. Feed Team Performance Encoder or merge with other match-level sources.",
+    },
   },
   {
     id: "fm_attributes",
@@ -191,6 +225,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "features", type: "number", default: 50 },
     ],
     implemented: false,
+    hints: {
+      placement:
+        "Pre-season player attribute snapshot. Feed into Player Profile Encoder to produce a quality/type embedding, often merged with form data.",
+      tips: ["Attributes only update once per FM release — pair with in-season form data to avoid a stale view."],
+    },
   },
   {
     id: "transfermarkt_values",
@@ -209,6 +248,10 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
     params: [{ name: "features", type: "number", default: 8 }],
     implemented: false,
+    hints: {
+      placement:
+        "Slowly-changing player context (value, age, contract). Merge with FM attributes or feed Player Profile Encoder.",
+    },
   },
   {
     id: "club_elo",
@@ -227,6 +270,10 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
     params: [{ name: "features", type: "number", default: 3 }],
     implemented: false,
+    hints: {
+      placement:
+        "Team-strength signal. Feed Team Performance Encoder or Data-Merge with other team-level sources.",
+    },
   },
   {
     id: "fbref_stats",
@@ -252,6 +299,10 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
     params: [{ name: "features", type: "number", default: 40 }],
     implemented: false,
+    hints: {
+      placement:
+        "Split the two output ports: `player_data` feeds Player Form Encoder, `match_data` feeds Team Performance Encoder.",
+    },
   },
   {
     id: "match_schedule",
@@ -270,6 +321,10 @@ export const NODE_REGISTRY: NodeDef[] = [
     ],
     params: [{ name: "features", type: "number", default: 10 }],
     implemented: false,
+    hints: {
+      placement:
+        "Per-fixture context data. Feed Match Context Encoder to produce a context embedding for Fusion.",
+    },
   },
   {
     id: "custom_dataset",
@@ -297,6 +352,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "features", type: "number", default: 10 },
     ],
     implemented: false,
+    hints: {
+      placement:
+        "Escape hatch for arbitrary data. Treat like any flat data source — augment and encode as needed before downstream models.",
+    },
   },
 
   // Augmentation / Preprocessing
@@ -318,6 +377,11 @@ export const NODE_REGISTRY: NodeDef[] = [
         options: ["standard", "minmax", "robust"],
       },
     ],
+    hints: {
+      placement:
+        "Sits between a data source (or merge) and a feature extractor. Order matters — normalize after missing-value imputation.",
+      tips: ["`standard` assumes roughly-gaussian features; use `robust` when outliers dominate."],
+    },
   },
   {
     id: "feature_selection",
@@ -338,6 +402,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       },
       { name: "threshold", type: "number", default: 0.01 },
     ],
+    hints: {
+      placement:
+        "Between a data source (or merge) and a feature extractor. Useful when rolling-stats nodes have inflated the column count.",
+    },
   },
   {
     id: "missing_value_imputation",
@@ -357,6 +425,11 @@ export const NODE_REGISTRY: NodeDef[] = [
         options: ["mean", "median", "zero", "forward_fill"],
       },
     ],
+    hints: {
+      placement:
+        "Between a data source and any downstream that can't tolerate NaNs (Normalize, MLP-based encoders).",
+      tips: ["`forward_fill` is for time-ordered tables — don't use it on static player-attribute data."],
+    },
   },
   {
     id: "temporal_window",
@@ -377,6 +450,10 @@ export const NODE_REGISTRY: NodeDef[] = [
         options: ["concat", "mean", "ewma"],
       },
     ],
+    hints: {
+      placement:
+        "Between a time-ordered table and a flat-consuming encoder. Output is still flat — use History Sequence if you need a (batch, seq_len, dim) tensor.",
+    },
   },
   {
     id: "noise_injection",
@@ -397,6 +474,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       },
       { name: "scale", type: "number", default: 0.1 },
     ],
+    hints: {
+      placement:
+        "Training-time regularization. Place right before the encoder whose outputs you want to make more robust.",
+      tips: ["Applied only during training — inference passes through unchanged."],
+    },
   },
   {
     id: "data_merge",
@@ -423,6 +505,11 @@ export const NODE_REGISTRY: NodeDef[] = [
         options: ["concat", "left_join", "inner_join"],
       },
     ],
+    hints: {
+      placement:
+        "Combines two data streams (e.g., SofaScore + ESPN). Sits between data sources and their shared downstream encoder.",
+      tips: ["Set `merge_on` to a key present in both inputs — player_id, team_id, or match_id — or the join silently produces empty rows."],
+    },
   },
   {
     id: "rolling_stats",
@@ -443,6 +530,10 @@ export const NODE_REGISTRY: NodeDef[] = [
         options: ["mean", "mean_std", "mean_std_minmax", "all"],
       },
     ],
+    hints: {
+      placement:
+        "On time-ordered team or player tables, before the corresponding encoder. Adds rolling-mean/std columns alongside the originals.",
+    },
   },
   {
     id: "log_transform",
@@ -455,6 +546,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "output", type: "output", dataType: "data", shape: "flat" },
     ],
     params: [{ name: "offset", type: "number", default: 1 }],
+    hints: {
+      placement:
+        "For heavy-tailed columns (market value, goal counts, attendance). Place before normalization.",
+    },
   },
 
   // Feature Extractors
@@ -486,6 +581,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "output_dim", type: "number", default: 64 },
       { name: "num_layers", type: "number", default: 3 },
     ],
+    hints: {
+      placement:
+        "Takes FM attributes or a merged player-context table and produces a dense embedding. Feeds Lineup GNN or Heterogeneous GNN.",
+    },
   },
   {
     id: "player_form",
@@ -515,6 +614,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "output_dim", type: "number", default: 64 },
       { name: "seq_len", type: "number", default: 10 },
     ],
+    hints: {
+      placement:
+        "Takes a per-match stat sequence and produces a form embedding. Feeds Lineup GNN or Fusion.",
+      tips: ["Input must have shape=sequence — wire it through Temporal Window or a naturally-sequential source."],
+    },
   },
   {
     id: "team_performance",
@@ -543,6 +647,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "hidden_dim", type: "number", default: 64 },
       { name: "output_dim", type: "number", default: 64 },
     ],
+    hints: {
+      placement:
+        "Takes team-level stats (xG, possession, Elo) and produces a team embedding. Feeds Fusion or a composition layer.",
+    },
   },
   {
     id: "match_context",
@@ -570,6 +678,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "input_dim", type: "number", default: 10 },
       { name: "output_dim", type: "number", default: 32 },
     ],
+    hints: {
+      placement:
+        "Takes per-fixture context (home/away, rest days, derby flag). Feeds Fusion alongside player and team embeddings.",
+    },
   },
 
   // Composition
@@ -603,6 +715,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "output_dim", type: "number", default: 64 },
       { name: "num_layers", type: "number", default: 2 },
     ],
+    hints: {
+      placement:
+        "Aggregates player embeddings into a team-level embedding. Typically feeds Fusion, or History Sequence → temporal for trajectory modeling.",
+      tips: ["Uses `stack` multi-input semantics — every upstream player-embedding width must equal player_dim."],
+    },
   },
 
   {
@@ -629,6 +746,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "num_layers", type: "number", default: 3 },
       { name: "dropout", type: "number", default: 0.2 },
     ],
+    hints: {
+      placement:
+        "Reads the raw dataset and produces per-match embeddings. Almost always followed by a History Sequence node before GRU Temporal.",
+      tips: ["Output is effectively 2×d_model (home ++ away concat) — keep the downstream `input_dim` consistent."],
+    },
   },
 
   // Fusion
@@ -662,6 +784,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "num_layers", type: "number", default: 2 },
       { name: "output_dim", type: "number", default: 128 },
     ],
+    hints: {
+      placement:
+        "Combines multiple upstream embedding streams into a single match representation. Usually sits between composition/feature-extractor outputs and the temporal stage.",
+      tips: ["`stack` semantics require every upstream width to equal d_model — mismatches surface as multi-stack errors on each incoming edge."],
+    },
   },
   {
     id: "hybrid_fusion",
@@ -693,9 +820,52 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "num_layers", type: "number", default: 2 },
       { name: "output_dim", type: "number", default: 128 },
     ],
+    hints: {
+      placement:
+        "Like Transformer Fusion, but each input group is projected and normalized independently first. Use when upstream widths or scales vary widely.",
+      tips: ["Requires a fixed number of inputs at init time — adding a new upstream later requires reinitializing the node."],
+    },
   },
 
   // Temporal
+  {
+    id: "match_history",
+    label: "History Sequence",
+    category: "temporal",
+    description:
+      "Build a sequence of recent embeddings for any entity — team, player, or match. For each target row, collects the previous N embeddings grouped by the `group_by` key and stacks them in chronological order.\n\nActs as the canonical bridge from flat per-entity embeddings (from a GNN, fusion node, or per-player/per-team encoder) to temporal models (GRU, Transformer) that expect a sequence.\n\nInput: Flat embedding (batch, d_model) whose entity id is resolvable from the upstream source.\nOutput: Sequence of embeddings (batch, window_size, d_model).",
+    ports: [
+      {
+        name: "embedding",
+        type: "input",
+        dataType: "embedding",
+        shape: "flat",
+        widthParam: "d_model",
+      },
+      {
+        name: "sequence",
+        type: "output",
+        dataType: "embedding",
+        shape: "sequence",
+        widthParam: "d_model",
+      },
+    ],
+    params: [
+      { name: "d_model", type: "number", default: 128 },
+      { name: "window_size", type: "number", default: 5 },
+      {
+        name: "group_by",
+        type: "select",
+        default: "team",
+        options: ["team", "player", "match"],
+      },
+    ],
+    hints: {
+      placement:
+        "Bridges flat per-entity embeddings into a (batch, seq_len, dim) sequence. Almost always sits between a composition/fusion node and a temporal layer (GRU Temporal, Transformer).",
+      tips: ["`group_by` selects the entity whose history is rolled up — make sure the upstream source carries that key (team_id / player_id / match_id)."],
+    },
+  },
   {
     id: "gru_temporal",
     label: "GRU Temporal",
@@ -724,6 +894,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "output_dim", type: "number", default: 128 },
       { name: "num_layers", type: "number", default: 1 },
     ],
+    hints: {
+      placement:
+        "Consumes a sequence produced by History Sequence (or any sequence-producing upstream) and emits a form/trajectory summary for a prediction head.",
+      tips: ["Returns only the final hidden state — stacking layers refines the summary but doesn't expose per-step outputs."],
+    },
   },
 
   // Prediction Heads
@@ -748,6 +923,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "input_dim", type: "number", default: 128 },
       { name: "num_classes", type: "number", default: 3 },
     ],
+    hints: {
+      placement:
+        "Terminal node. Consumes the temporal state (or a fusion/composition output if you skip the temporal stage) and emits [win, draw, loss] logits.",
+    },
   },
   {
     id: "scoreline",
@@ -770,6 +949,11 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "input_dim", type: "number", default: 128 },
       { name: "max_goals", type: "number", default: 10 },
     ],
+    hints: {
+      placement:
+        "Terminal node. Consumes the temporal state and emits per-team goal-count distributions for home and away.",
+      tips: ["`max_goals` caps the distribution — set it above the historical max scoreline or the tail gets truncated."],
+    },
   },
   {
     id: "player_stat",
@@ -792,6 +976,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "input_dim", type: "number", default: 128 },
       { name: "num_stats", type: "number", default: 5 },
     ],
+    hints: {
+      placement:
+        "Terminal node for per-player regression targets (goals, assists, shots, key passes).",
+    },
   },
   {
     id: "match_stat",
@@ -814,6 +1002,10 @@ export const NODE_REGISTRY: NodeDef[] = [
       { name: "input_dim", type: "number", default: 128 },
       { name: "num_stats", type: "number", default: 8 },
     ],
+    hints: {
+      placement:
+        "Terminal node for team-level regression targets (xG, possession, shots, corners, fouls).",
+    },
   },
 ];
 
@@ -829,4 +1021,42 @@ export function getNodesByCategory(): Map<string, NodeDef[]> {
     map.set(node.category, list);
   }
   return map;
+}
+
+function effectivePortShape(port: PortDef): PortShape {
+  if (port.shape) return port.shape;
+  if (port.dataType === "dataset") return "dataset";
+  if (port.dataType === "graph") return "graph";
+  return "flat";
+}
+
+// Find nodes that can bridge a shape mismatch: they accept `fromShape` on an
+// input port and produce `toShape` on an output port, both of the given
+// dataType. Used by the validator to name concrete remediation nodes when a
+// connection has mismatched shapes. "Coming soon" nodes are excluded so we
+// don't recommend something the user can't actually use.
+export function findShapeAdapters(
+  fromShape: PortShape,
+  toShape: PortShape,
+  dataType: PortDef["dataType"]
+): NodeDef[] {
+  if (fromShape === toShape) return [];
+  const matches: NodeDef[] = [];
+  for (const def of NODE_REGISTRY) {
+    if (def.implemented === false) continue;
+    const hasInput = def.ports.some(
+      (p) =>
+        p.type === "input" &&
+        p.dataType === dataType &&
+        effectivePortShape(p) === fromShape
+    );
+    const hasOutput = def.ports.some(
+      (p) =>
+        p.type === "output" &&
+        p.dataType === dataType &&
+        effectivePortShape(p) === toShape
+    );
+    if (hasInput && hasOutput) matches.push(def);
+  }
+  return matches;
 }

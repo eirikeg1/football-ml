@@ -6,7 +6,7 @@ import type {
   ValidationIssue,
   ValidationSeverity,
 } from "./types";
-import { getNodeDef, NODE_REGISTRY } from "./registry";
+import { findShapeAdapters, getNodeDef, NODE_REGISTRY } from "./registry";
 
 type PortType = "input" | "output";
 
@@ -197,11 +197,24 @@ export function validateConnection(
   const fromShape = effectiveShape(fromPort);
   const toShape = effectiveShape(toPort);
   if (fromShape !== toShape) {
+    // Look for registry nodes that can bridge this shape gap for the same
+    // dataType (embedding, data, etc.), so we can name concrete remediation
+    // nodes in the detail instead of a generic phrasing.
+    const adapters =
+      fromPort.dataType === toPort.dataType
+        ? findShapeAdapters(fromShape, toShape, fromPort.dataType)
+        : [];
+    const adapterHint =
+      adapters.length > 0
+        ? ` Insert ${adapters.length === 1 ? "a" : "one of"} ${adapters
+            .map((a) => `"${a.label}"`)
+            .join(" or ")} between them to convert ${shapeLabel(fromShape)} → ${shapeLabel(toShape)}.`
+        : " Insert an adapter node (or change the upstream source) to match the expected shape.";
     issues.push({
       severity: "error",
       code: "shape_mismatch",
       message: `Shape mismatch: ${shapeLabel(fromShape)} → ${shapeLabel(toShape)}`,
-      detail: `Upstream produces a ${shapeLabel(fromShape)} output but the downstream input expects ${shapeLabel(toShape)}. Insert an adapter (e.g., temporal window to turn flat data into a sequence) or change the upstream source.`,
+      detail: `Upstream "${fromDef.label}" produces a ${shapeLabel(fromShape)} output but "${toDef.label}" expects ${shapeLabel(toShape)}.${adapterHint}`,
     });
   }
 
