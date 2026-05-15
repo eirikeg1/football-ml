@@ -1,0 +1,107 @@
+# Multi-stream fusion: team performance + match context, merged by Transformer Fusion.
+#
+# Two table selectors split a SQLite source into a team-stats table and a
+# fixture-context table. Each feeds its own encoder; the embeddings are stacked
+# in Transformer Fusion, rolled into a per-team history sequence, and consumed
+# by both an outcome and a match-stat head.
+#
+# Width chain (must all line up for stack fusion):
+#   team_performance.output_dim = 64
+#   match_context.output_dim    = 64    (overridden from default 32)
+#   transformer_fusion.d_model  = 64    (stack semantics)
+#   transformer_fusion.output_dim = 128 → history.d_model = 128 → gru.input_dim = 128
+nodes:
+  sqlite_source_1:
+    type: sqlite_source
+    position: [50, 150]
+    params:
+      db_path: ~/Data/football/matches/football.db
+
+  table_selector_team:
+    type: table_selector
+    position: [350, 50]
+    params:
+      table: match_stats
+
+  table_selector_context:
+    type: table_selector
+    position: [350, 300]
+    params:
+      table: matches
+
+  team_performance_1:
+    type: team_performance
+    position: [650, 50]
+    params:
+      input_dim: 15
+      hidden_dim: 64
+      output_dim: 64
+
+  match_context_1:
+    type: match_context
+    position: [650, 300]
+    params:
+      input_dim: 10
+      output_dim: 64
+
+  transformer_fusion_1:
+    type: transformer_fusion
+    position: [1250, 175]
+    params:
+      d_model: 64
+      nhead: 4
+      num_layers: 2
+      output_dim: 128
+
+  match_history_1:
+    type: match_history
+    position: [1550, 175]
+    params:
+      d_model: 128
+      window_size: 5
+      group_by: team
+
+  gru_temporal_1:
+    type: gru_temporal
+    position: [1550, 400]
+    params:
+      input_dim: 128
+      hidden_dim: 128
+      output_dim: 128
+      num_layers: 1
+
+  match_outcome_1:
+    type: match_outcome
+    position: [1850, 50]
+    params:
+      input_dim: 128
+      num_classes: 3
+
+  match_stat_1:
+    type: match_stat
+    position: [1850, 300]
+    params:
+      input_dim: 128
+      num_stats: 8
+
+connections:
+  - from: sqlite_source_1.dataset
+    to: table_selector_team.dataset
+  - from: sqlite_source_1.dataset
+    to: table_selector_context.dataset
+  - from: table_selector_team.table_data
+    to: team_performance_1.stats
+  - from: table_selector_context.table_data
+    to: match_context_1.context
+  - from: team_performance_1.embedding
+    to: transformer_fusion_1.embeddings
+  - from: match_context_1.embedding
+    to: transformer_fusion_1.embeddings
+  - from: transformer_fusion_1.match_repr
+    to: match_history_1.embedding
+  - from: match_history_1.sequence
+    to: gru_temporal_1.sequence
+  - from: gru_temporal_1.temporal_state
+    to: match_outcome_1.temporal_state
+  - from: gru_temporal_1.temporal_state
+    to: match_stat_1.temporal_state

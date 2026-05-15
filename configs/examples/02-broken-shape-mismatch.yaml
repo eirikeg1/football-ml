@@ -1,0 +1,47 @@
+# Intentionally broken: hetero_gnn wired directly into gru_temporal.
+#
+# hetero_gnn.match_repr is a flat embedding; gru_temporal.sequence expects a
+# sequence. After import, the connection should show a shape_mismatch error
+# whose detail names "History Sequence" as the adapter to insert. Use it to
+# verify the new validator hints. Fix by dropping a History Sequence node in
+# between (same flow as 01-minimal-hetero-gnn.yaml).
+nodes:
+  sqlite_source_1:
+    type: sqlite_source
+    position: [50, 150]
+    params:
+      db_path: ~/Data/football/matches/football.db
+
+  hetero_gnn_1:
+    type: hetero_gnn
+    position: [950, 150]
+    params:
+      d_model: 128
+      num_heads: 8
+      num_layers: 3
+      dropout: 0.2
+
+  gru_temporal_1:
+    type: gru_temporal
+    position: [1550, 150]
+    params:
+      input_dim: 128
+      hidden_dim: 128
+      output_dim: 128
+      num_layers: 1
+
+  match_outcome_1:
+    type: match_outcome
+    position: [1850, 150]
+    params:
+      input_dim: 128
+      num_classes: 3
+
+connections:
+  - from: sqlite_source_1.dataset
+    to: hetero_gnn_1.dataset
+  # ↓ shape_mismatch: flat → sequence. Error detail should name History Sequence.
+  - from: hetero_gnn_1.match_repr
+    to: gru_temporal_1.sequence
+  - from: gru_temporal_1.temporal_state
+    to: match_outcome_1.temporal_state

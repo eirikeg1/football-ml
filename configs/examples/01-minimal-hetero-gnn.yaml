@@ -1,0 +1,63 @@
+# Minimal heterogeneous GNN pipeline — golden path.
+#
+# SQLite → Heterogeneous GNN → History Sequence → GRU → match_outcome + scoreline.
+# Validates clean on import. Use this as the baseline reference; the other
+# example pipelines are variations on it.
+nodes:
+  sqlite_source_1:
+    type: sqlite_source
+    position: [50, 150]
+    params:
+      db_path: ~/Data/football/matches/football.db
+
+  hetero_gnn_1:
+    type: hetero_gnn
+    position: [950, 150]
+    params:
+      d_model: 128
+      num_heads: 8
+      num_layers: 3
+      dropout: 0.2
+
+  match_history_1:
+    type: match_history
+    position: [1550, 150]
+    params:
+      d_model: 128
+      window_size: 5
+      group_by: match
+
+  gru_temporal_1:
+    type: gru_temporal
+    position: [1550, 400]
+    params:
+      input_dim: 128
+      hidden_dim: 128
+      output_dim: 128
+      num_layers: 1
+
+  match_outcome_1:
+    type: match_outcome
+    position: [1850, 50]
+    params:
+      input_dim: 128
+      num_classes: 3
+
+  scoreline_1:
+    type: scoreline
+    position: [1850, 250]
+    params:
+      input_dim: 128
+      max_goals: 10
+
+connections:
+  - from: sqlite_source_1.dataset
+    to: hetero_gnn_1.dataset
+  - from: hetero_gnn_1.match_repr
+    to: match_history_1.embedding
+  - from: match_history_1.sequence
+    to: gru_temporal_1.sequence
+  - from: gru_temporal_1.temporal_state
+    to: match_outcome_1.temporal_state
+  - from: gru_temporal_1.temporal_state
+    to: scoreline_1.temporal_state

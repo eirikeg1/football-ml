@@ -1,0 +1,79 @@
+# Lineup GNN over player profiles, rolled into a per-team history sequence.
+#
+# SQLite → Table Selector (players) → Player Profile Encoder → Lineup GNN.
+# Lineup GNN uses `stack` multi-input semantics, so every upstream player
+# embedding width must equal player_dim. Output is a team-level embedding that
+# flows through History Sequence (group_by=team) and GRU into a match_outcome
+# head.
+#
+# Width chain:
+#   player_profile.output_dim = 128 → lineup_gnn.player_dim = 128
+#   lineup_gnn.output_dim     = 128 → history.d_model = 128 → gru.input_dim = 128
+nodes:
+  sqlite_source_1:
+    type: sqlite_source
+    position: [50, 150]
+    params:
+      db_path: ~/Data/football/matches/football.db
+
+  table_selector_1:
+    type: table_selector
+    position: [350, 150]
+    params:
+      table: players
+
+  player_profile_1:
+    type: player_profile
+    position: [650, 150]
+    params:
+      input_dim: 50
+      hidden_dim: 128
+      output_dim: 128
+      num_layers: 3
+
+  lineup_gnn_1:
+    type: lineup_gnn
+    position: [950, 150]
+    params:
+      player_dim: 128
+      hidden_dim: 128
+      output_dim: 128
+      num_layers: 2
+
+  match_history_1:
+    type: match_history
+    position: [1550, 150]
+    params:
+      d_model: 128
+      window_size: 5
+      group_by: team
+
+  gru_temporal_1:
+    type: gru_temporal
+    position: [1550, 400]
+    params:
+      input_dim: 128
+      hidden_dim: 128
+      output_dim: 128
+      num_layers: 1
+
+  match_outcome_1:
+    type: match_outcome
+    position: [1850, 150]
+    params:
+      input_dim: 128
+      num_classes: 3
+
+connections:
+  - from: sqlite_source_1.dataset
+    to: table_selector_1.dataset
+  - from: table_selector_1.table_data
+    to: player_profile_1.attributes
+  - from: player_profile_1.embedding
+    to: lineup_gnn_1.player_embeddings
+  - from: lineup_gnn_1.team_embedding
+    to: match_history_1.embedding
+  - from: match_history_1.sequence
+    to: gru_temporal_1.sequence
+  - from: gru_temporal_1.temporal_state
+    to: match_outcome_1.temporal_state
