@@ -2,18 +2,40 @@
 
 from __future__ import annotations
 
+import random
 from collections.abc import Callable
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 from torch import Tensor
 
+from football_ml.data.splits import make_split
 from football_ml.datasource.base import RelationshipMeta
 from football_ml.datasource.sqlite_source import SqliteSource
 from football_ml.datasource.snapshot import SnapshotBuilder, TrainingSample
 from football_ml.config import HeteroGNNConfig, SnapshotConfig
 from football_ml.training.config import TrainingConfig
+
+
+def apply_seed(seed: int | None) -> None:
+    """Pin Python/NumPy/PyTorch RNGs. No-op when seed is None."""
+    if seed is None:
+        return
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def _downsample(samples: list, max_samples: int | None) -> list:
+    """Uniformly stride-downsample to at most `max_samples`, preserving order."""
+    if max_samples is None or len(samples) <= max_samples:
+        return samples
+    stride = max(1, len(samples) // max_samples)
+    return samples[::stride][:max_samples]
 
 
 def _parse_pipeline_yaml(pipeline_data: dict) -> tuple[str | None, dict | None]:
@@ -67,14 +89,17 @@ def load_hetero_data(
     source_config: dict,
     training_config: TrainingConfig,
     log: Callable[[str, str], None] | None = None,
-) -> tuple[list[dict], list[dict], tuple, int, int]:
+) -> tuple[list[dict], list[dict], list[dict], tuple, int, int, dict[str, int]]:
     """Load data for HeteroGNN training.
 
     Returns:
-        (train_batches, val_batches, metadata, num_teams, num_competitions)
+        (train_batches, val_batches, test_batches, metadata, num_teams,
+         num_competitions, feature_dims)
         Each batch is a dict with "inputs" and "targets" keys.
     """
     _log = log or (lambda l, m: None)
+
+    apply_seed(training_config.seed)
 
     src = SqliteSource(db_path)
     schema = src.introspect()
@@ -130,15 +155,29 @@ def load_hetero_data(
     if not samples:
         raise ValueError("No training samples could be created. Check data filters.")
 
+    samples = _downsample(samples, training_config.max_samples)
+    if training_config.max_samples is not None:
+        _log("info", f"Downsampled to {len(samples)} samples for smoke mode")
+
     # Get metadata from the first snapshot
     metadata = samples[0].metadata
 
-    # Time-based split: last val_split fraction for validation
-    split_idx = int(len(samples) * (1 - training_config.val_split))
-    train_samples = samples[:split_idx]
-    val_samples = samples[split_idx:]
+    train_idx, val_idx, test_idx = make_split(
+        training_config.split_strategy,
+        samples,
+        tables.get("matches", pd.DataFrame()),
+        training_config.split_params,
+        training_config.seed,
+    )
+    train_samples = [samples[i] for i in train_idx]
+    val_samples = [samples[i] for i in val_idx]
+    test_samples = [samples[i] for i in test_idx]
 
-    _log("info", f"Train: {len(train_samples)} samples, Val: {len(val_samples)} samples")
+    _log(
+        "info",
+        f"Split [{training_config.split_strategy}] — train: {len(train_samples)}, "
+        f"val: {len(val_samples)}, test: {len(test_samples)}",
+    )
 
     # Group samples by snapshot date — one GNN forward pass per unique date
     from collections import defaultdict
@@ -188,8 +227,14 @@ def load_hetero_data(
 
     train_batches = make_batches(train_samples)
     val_batches = make_batches(val_samples)
+    test_batches = make_batches(test_samples)
 
-    _log("info", f"Train batches: {len(train_batches)}, Val batches: {len(val_batches)}")
+    _log(
+        "info",
+        f"Train batches: {len(train_batches)}, "
+        f"Val batches: {len(val_batches)}, "
+        f"Test batches: {len(test_batches)}",
+    )
 
     # Collect actual feature dims from a representative snapshot (use a
     # middle batch where all node types have real data, not the first
@@ -203,7 +248,15 @@ def load_hetero_data(
 
     _log("info", f"Node feature dims: {feature_dims}")
 
-    return train_batches, val_batches, metadata, num_teams, num_competitions, feature_dims
+    return (
+        train_batches,
+        val_batches,
+        test_batches,
+        metadata,
+        num_teams,
+        num_competitions,
+        feature_dims,
+    )
 
 
 def load_flat_data(
@@ -213,7 +266,7 @@ def load_flat_data(
     log: Callable[[str, str], None] | None = None,
     rolling_window: int = 10,
     min_history: int = 5,
-) -> tuple[list[dict], list[dict], int]:
+) -> tuple[list[dict], list[dict], list[dict], int]:
     """Load flattened data for the standard FootballPipeline.
 
     Uses **rolling historical averages** of each team's stats from their
@@ -226,11 +279,10 @@ def load_flat_data(
          home_h2h_win_rate | draw_rate | away_h2h_win_rate]
 
     Returns:
-        (train_batches, val_batches, feature_dim_per_team)
+        (train_batches, val_batches, test_batches, feature_dim_total)
     """
-    import numpy as np
-
     _log = log or (lambda l, m: None)
+    apply_seed(training_config.seed)
 
     src = SqliteSource(db_path)
     schema = src.introspect()
@@ -319,6 +371,8 @@ def load_flat_data(
     # ── Assemble feature vectors ─────────────────────────────────────
     feature_rows = []
     label_rows = []
+    sample_match_ids: list[int] = []
+    sample_date_keys: list[int] = []
     n_stats = len(available_stat_cols)
 
     for _, match in matches.iterrows():
@@ -354,6 +408,8 @@ def load_flat_data(
             + h2h_features        # h2h win/draw/loss rates
         )
         feature_rows.append(features)
+        sample_match_ids.append(match_id)
+        sample_date_keys.append(int(match["kickoff_time"]))
 
         # Label
         hs = int(match["home_score"])
@@ -382,22 +438,67 @@ def load_flat_data(
     if not feature_rows:
         raise ValueError("No matches with sufficient history found")
 
+    # Smoke-mode downsampling preserves time order (uniform stride).
+    if training_config.max_samples is not None and len(feature_rows) > training_config.max_samples:
+        stride = max(1, len(feature_rows) // training_config.max_samples)
+        keep = list(range(0, len(feature_rows), stride))[: training_config.max_samples]
+        feature_rows = [feature_rows[i] for i in keep]
+        label_rows = [label_rows[i] for i in keep]
+        sample_match_ids = [sample_match_ids[i] for i in keep]
+        sample_date_keys = [sample_date_keys[i] for i in keep]
+        _log("info", f"Downsampled to {len(feature_rows)} samples for smoke mode")
+
     features_tensor = torch.tensor(feature_rows, dtype=torch.float32)
     labels_tensor = torch.tensor(label_rows, dtype=torch.long)
 
-    # Normalize features (z-score on training set)
-    split_idx = int(len(features_tensor) * (1 - training_config.val_split))
-    train_mean = features_tensor[:split_idx].mean(dim=0)
-    train_std = features_tensor[:split_idx].std(dim=0).clamp(min=1e-6)
+    # Build sample stand-ins for the split function.
+    class _FlatSample:
+        __slots__ = ("match_id", "date_key")
+
+        def __init__(self, match_id: int, date_key: int) -> None:
+            self.match_id = match_id
+            self.date_key = date_key
+
+    flat_samples = [
+        _FlatSample(m, d) for m, d in zip(sample_match_ids, sample_date_keys, strict=True)
+    ]
+    train_idx, val_idx, test_idx = make_split(
+        training_config.split_strategy,
+        flat_samples,
+        matches,
+        training_config.split_params,
+        training_config.seed,
+    )
+    train_idx_t = torch.tensor(train_idx, dtype=torch.long)
+    val_idx_t = torch.tensor(val_idx, dtype=torch.long)
+    test_idx_t = torch.tensor(test_idx, dtype=torch.long)
+
+    # Normalize features (z-score on training set only — no leakage from val/test).
+    if len(train_idx_t) == 0:
+        raise ValueError(
+            "Split produced an empty train set; check split_strategy / split_params."
+        )
+    train_mean = features_tensor[train_idx_t].mean(dim=0)
+    train_std = features_tensor[train_idx_t].std(dim=0).clamp(min=1e-6)
     features_tensor = (features_tensor - train_mean) / train_std
 
-    train_x, val_x = features_tensor[:split_idx], features_tensor[split_idx:]
-    train_y, val_y = labels_tensor[:split_idx], labels_tensor[split_idx:]
+    train_x = features_tensor[train_idx_t]
+    val_x = features_tensor[val_idx_t]
+    test_x = features_tensor[test_idx_t]
+    train_y = labels_tensor[train_idx_t]
+    val_y = labels_tensor[val_idx_t]
+    test_y = labels_tensor[test_idx_t]
 
-    _log("info", f"Train: {len(train_x)}, Val: {len(val_x)}")
+    _log(
+        "info",
+        f"Split [{training_config.split_strategy}] — "
+        f"Train: {len(train_x)}, Val: {len(val_x)}, Test: {len(test_x)}",
+    )
 
     # Label distribution
-    for split_name, labels in [("Train", train_y), ("Val", val_y)]:
+    for split_name, labels in [("Train", train_y), ("Val", val_y), ("Test", test_y)]:
+        if len(labels) == 0:
+            continue
         counts = torch.bincount(labels, minlength=3)
         total = len(labels)
         _log("info", f"  {split_name} labels: home_win={counts[0]} ({counts[0]*100//total}%), "
@@ -422,10 +523,16 @@ def load_flat_data(
     batch_size = training_config.batch_size
     train_batches = make_batches(train_x, train_y, batch_size)
     val_batches = make_batches(val_x, val_y, batch_size)
+    test_batches = make_batches(test_x, test_y, batch_size)
 
-    _log("info", f"Train batches: {len(train_batches)}, Val batches: {len(val_batches)}")
+    _log(
+        "info",
+        f"Train batches: {len(train_batches)}, "
+        f"Val batches: {len(val_batches)}, "
+        f"Test batches: {len(test_batches)}",
+    )
 
-    return train_batches, val_batches, total_feat_dim
+    return train_batches, val_batches, test_batches, total_feat_dim
 
 
 def _make_dummy_lineup(batch_size: int):

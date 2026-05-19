@@ -14,7 +14,7 @@ class TrainingConfig:
     weight_decay: float = 0.0
     epochs: int = 50
     batch_size: int = 32
-    val_split: float = 0.2
+    val_split: float = 0.2  # legacy; only consulted by split_strategy=time_percentile fallbacks
     early_stopping_patience: int = 10
     heads: list[str] = field(default_factory=lambda: ["match_outcome"])
     loss_overrides: dict[str, str] = field(default_factory=dict)
@@ -23,6 +23,19 @@ class TrainingConfig:
     scheduler: str | None = None  # "step" | "cosine" | "warmup"
     scheduler_params: dict = field(default_factory=dict)
     checkpoint_dir: str = "checkpoints"
+
+    # Reproducibility + smoke-mode controls used by the CLI / search loop.
+    seed: int | None = None
+    max_samples: int | None = None  # uniformly stride-downsample before split when set
+    max_epochs: int | None = None  # caps `epochs` at runtime; lets smoke override full configs
+
+    # Parametric three-way split. Mechanism lives in football_ml.data.splits.
+    split_strategy: str = "latest_season_per_competition"
+    split_params: dict = field(default_factory=dict)
+
+    # nvidia-smi sampler controls (off by default; CLI flips these on).
+    gpu_monitor: bool = False
+    gpu_monitor_interval: float = 5.0
 
     def to_dict(self) -> dict:
         return asdict(self)

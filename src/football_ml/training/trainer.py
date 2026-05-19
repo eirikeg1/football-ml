@@ -298,10 +298,10 @@ class Trainer:
         return val_loss, metrics
 
     def _save_checkpoint(self, epoch: int) -> None:
-        """Save model checkpoint."""
+        """Save model checkpoint to <checkpoint_dir>/checkpoint.pt (overwrites on improvement)."""
         ckpt_dir = Path(self.config.checkpoint_dir)
         ckpt_dir.mkdir(parents=True, exist_ok=True)
-        path = ckpt_dir / "best_model.pt"
+        path = ckpt_dir / "checkpoint.pt"
         torch.save(
             {
                 "epoch": epoch,

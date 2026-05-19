@@ -152,7 +152,7 @@ async def start_training(request: TrainRequest) -> dict:
             if db_path and use_hetero:
                 # HeteroGNN path — load via SnapshotBuilder
                 on_log("info", f"Loading HeteroGNN data from {db_path}")
-                train_data, val_data, metadata, num_teams, num_comps, feature_dims = load_hetero_data(
+                train_data, val_data, _test_data, metadata, num_teams, num_comps, feature_dims = load_hetero_data(
                     db_path, source_config or {}, config, log=on_log,
                 )
 
@@ -181,7 +181,7 @@ async def start_training(request: TrainRequest) -> dict:
             elif db_path:
                 # Flat pipeline — rolling historical features → simple MLP
                 on_log("info", f"Loading flat data from {db_path}")
-                train_data, val_data, feat_dim = load_flat_data(
+                train_data, val_data, _test_data, feat_dim = load_flat_data(
                     db_path, source_config or {}, config, log=on_log,
                 )
 
