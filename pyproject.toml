@@ -24,6 +24,16 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
 ]
+search = [
+    "matplotlib>=3.8",
+]
+
+[project.scripts]
+football-ml-train = "football_ml.cli.train:main"
+football-ml-test-eval = "football_ml.cli.test_eval:main"
+football-ml-leaderboard = "football_ml.search.leaderboard:main"
+football-ml-report = "football_ml.search.report:main"
+football-ml-multi-seed = "football_ml.search.multi_seed:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
