@@ -1,1 +1,10 @@
 configs/custom
+
+# Build artifacts
+webapp/dist/
+
+# Training artifacts
+checkpoints/
+
+# Local Claude Code settings
+.claude/settings.local.json
